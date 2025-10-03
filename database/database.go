@@ -13,7 +13,9 @@ var (
 	once sync.Once
 )
 
-func GetDB() *gorm.DB {
+var DB *gorm.DB
+
+func InitDB() {
 	once.Do(func() {
 		dsn := "root:Hamham1miau!@tcp(127.0.0.1:3306)/game?charset=utf8mb4&parseTime=True&loc=Local"
 
@@ -25,5 +27,5 @@ func GetDB() *gorm.DB {
 		db = conn
 	})
 
-	return db
+	DB = db
 }

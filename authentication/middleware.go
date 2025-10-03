@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"github.com/golang-jwt/jwt/v5"
-	"gorm.io/gorm"
 	"net/http"
 	"strings"
 
@@ -12,8 +11,9 @@ import (
 )
 
 type Server struct {
-	Db *gorm.DB
 }
+
+var JwtSecret = []byte("replace-with-a-strong-secret")
 
 func (s *Server) AuthMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
@@ -36,7 +36,7 @@ func (s *Server) AuthMiddleware() gin.HandlerFunc {
 			if t.Method.Alg() != jwt.SigningMethodHS256.Alg() {
 				return nil, fmt.Errorf("unexpected signing method: %v", t.Header["alg"])
 			}
-			return jwtSecret, nil
+			return JwtSecret, nil
 		})
 		if err != nil || !parsed.Valid {
 			c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid token"})

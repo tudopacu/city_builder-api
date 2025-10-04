@@ -21,5 +21,8 @@ func InitRouter() {
 
 	addr := ":5000"
 	log.Printf("listening on %s", addr)
-	r.Run(addr)
+	err := r.Run(addr)
+	if err != nil {
+		return
+	}
 }

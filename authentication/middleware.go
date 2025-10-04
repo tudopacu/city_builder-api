@@ -15,6 +15,10 @@ type Server struct {
 
 var JwtSecret = []byte("replace-with-a-strong-secret")
 
+type contextKey string
+
+const userIDKey contextKey = "user_id"
+
 func (s *Server) AuthMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var tokenStr string
@@ -65,7 +69,7 @@ func (s *Server) AuthMiddleware() gin.HandlerFunc {
 			return
 		}
 
-		ctx := context.WithValue(c.Request.Context(), "user_id", id)
+		ctx := context.WithValue(c.Request.Context(), userIDKey, id)
 		c.Request = c.Request.WithContext(ctx)
 		c.Set("user_id", id)
 

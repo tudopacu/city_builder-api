@@ -21,7 +21,7 @@ func GetMap(c *gin.Context) {
 	id := c.Param("id")
 	var mapModel models.Map
 
-	if err := database.DB.First(&mapModel, id).Error; err != nil {
+	if err := database.DB.Preload("Terrains.Tile").First(&mapModel, id).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "map not found"})
 		return
 	}

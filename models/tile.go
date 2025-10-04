@@ -11,4 +11,6 @@ type Tile struct {
 	ImageURL  *string   `gorm:"type:varchar(255)" json:"image_url,omitempty"`
 	CreatedAt time.Time `gorm:"autoCreateTime" json:"created_at"`
 	UpdatedAt time.Time `gorm:"autoUpdateTime" json:"updated_at"`
+
+	Terrains []Terrain `gorm:"foreignKey:TileID;constraint:OnUpdate:CASCADE,OnDelete:SET NULL;" json:"terrains,omitempty"`
 }

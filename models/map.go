@@ -9,4 +9,6 @@ type Map struct {
 	Length    int       `gorm:"not null" json:"length"`
 	CreatedAt time.Time `gorm:"autoCreateTime" json:"created_at"`
 	UpdatedAt time.Time `gorm:"autoUpdateTime" json:"updated_at"`
+
+	Terrains []Terrain `gorm:"foreignKey:MapID;constraint:OnUpdate:CASCADE,OnDelete:CASCADE;" json:"terrains"`
 }

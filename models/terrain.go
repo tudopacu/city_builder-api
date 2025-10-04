@@ -26,6 +26,6 @@ type Terrain struct {
 	UpdatedAt time.Time `gorm:"autoUpdateTime" json:"updated_at"`
 
 	// Associations
-	Map  Map  `gorm:"foreignKey:MapID;constraint:OnUpdate:CASCADE,OnDelete:CASCADE;" json:"map"`
+	//Map  Map  `gorm:"foreignKey:MapID;constraint:OnUpdate:CASCADE,OnDelete:CASCADE;" json:"map"`
 	Tile Tile `gorm:"foreignKey:TileID;constraint:OnUpdate:CASCADE,OnDelete:CASCADE;" json:"tile"`
 }

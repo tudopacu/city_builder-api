@@ -44,7 +44,7 @@ func Register(request dto.PlayerRegistrationRequest) (int, dto.PlayerRegistratio
 		return http.StatusInternalServerError, dto.PlayerRegistrationResponse{Error: "Failed to create player"}
 	}
 
-	return http.StatusInternalServerError, dto.PlayerRegistrationResponse{Player: &dto.Player{Id: player.ID, Username: player.Username}}
+	return http.StatusOK, dto.PlayerRegistrationResponse{Player: &dto.Player{Id: player.ID, Username: player.Username}}
 }
 
 func Login(request dto.PlayerLoginRequest) (int, dto.PlayerLoginResponse, *http.Cookie) {
@@ -78,5 +78,5 @@ func Login(request dto.PlayerLoginRequest) (int, dto.PlayerLoginResponse, *http.
 		HttpOnly: true,
 	}
 
-	return http.StatusOK, dto.PlayerLoginResponse{Message: "Logged in"}, cookie
+	return http.StatusOK, dto.PlayerLoginResponse{Player: &dto.Player{Id: player.ID, Username: player.Username}}, cookie
 }

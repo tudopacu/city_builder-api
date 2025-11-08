@@ -49,3 +49,15 @@ func HandleLogout(c *gin.Context) {
 	http.SetCookie(c.Writer, cookie)
 	c.JSON(http.StatusOK, gin.H{"message": "logged out"})
 }
+
+func GetPlayer(c *gin.Context) {
+	tokenCookie, err := c.Request.Cookie("auth_token")
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "missing auth token"})
+		return
+	}
+
+	var statusCode, response = services.PlayerByCookie(tokenCookie)
+
+	c.JSON(statusCode, response)
+}

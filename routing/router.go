@@ -3,6 +3,7 @@ package routing
 import (
 	"API/api/controllers"
 	"API/authentication"
+	"API/configuration"
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 	"log"
@@ -14,13 +15,17 @@ func InitRouter() {
 	r := gin.Default()
 
 	r.Use(cors.New(cors.Config{
-		AllowOrigins:     []string{"http://localhost:5173"},
-		AllowMethods:     []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
+		AllowOrigins:     []string{configuration.GameURL, configuration.SiteURL},
+		AllowMethods:     []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"}, //todo restrict these
 		AllowHeaders:     []string{"Origin", "Content-Type", "Authorization"},
 		ExposeHeaders:    []string{"Content-Length"},
 		AllowCredentials: true,
 		MaxAge:           12 * time.Hour,
 	}))
+
+	game := r.Group("/game")
+	game.GET("/get_player", controllers.GetPlayer)
+	game.GET("/map/:id", controllers.GetMap)
 
 	r.POST("/register", controllers.HandleRegister)
 	r.POST("/login", controllers.HandleLogin)
@@ -28,7 +33,6 @@ func InitRouter() {
 
 	auth := r.Group("/").Use(s.AuthMiddleware())
 	auth.GET("/maps", controllers.GetMaps)
-	auth.GET("/map/:id", controllers.GetMap)
 
 	addr := ":5000"
 	log.Printf("listening on %s", addr)

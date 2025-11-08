@@ -70,13 +70,39 @@ func Login(request dto.PlayerLoginRequest) (int, dto.PlayerLoginResponse, *http.
 		return http.StatusInternalServerError, dto.PlayerLoginResponse{Error: "Failed to create token"}, nil
 	}
 
+	//todo this cookie needs to change on https and in production, set Secure to true and SAmeSite to proper value
 	cookie := &http.Cookie{
 		Name:     "auth_token",
 		Value:    signed,
 		Path:     "/",
 		Expires:  expiresAt,
-		HttpOnly: true,
+		HttpOnly: false,
+		Secure:   false,
+		SameSite: http.SameSiteLaxMode,
+		MaxAge:   3600 * 24,
 	}
 
 	return http.StatusOK, dto.PlayerLoginResponse{Player: &dto.Player{Id: player.ID, Username: player.Username}}, cookie
+}
+
+func PlayerByCookie(cookie *http.Cookie) (int, dto.PlayerByCookieResponse) {
+	token, err := jwt.ParseWithClaims(cookie.Value, &jwt.RegisteredClaims{}, func(token *jwt.Token) (interface{}, error) {
+		return authentication.JwtSecret, nil
+	})
+
+	if err != nil || !token.Valid {
+		return http.StatusUnauthorized, dto.PlayerByCookieResponse{Error: "Invalid token"}
+	}
+
+	claims, ok := token.Claims.(*jwt.RegisteredClaims)
+	if !ok {
+		return http.StatusUnauthorized, dto.PlayerByCookieResponse{Error: "Invalid token claims"}
+	}
+
+	var player models.Player
+	if err := database.DB.First(&player, claims.Subject).Error; err != nil {
+		return http.StatusNotFound, dto.PlayerByCookieResponse{Error: "Player not found"}
+	}
+
+	return http.StatusOK, dto.PlayerByCookieResponse{Player: &dto.Player{Id: player.ID, Username: player.Username}}
 }

@@ -1,6 +1,7 @@
 package models
 
 import (
+	"API/api/dto"
 	"time"
 )
 
@@ -28,4 +29,15 @@ type Terrain struct {
 	// Associations
 	//Map  Map  `gorm:"foreignKey:MapID;constraint:OnUpdate:CASCADE,OnDelete:CASCADE;" json:"map"`
 	Tile Tile `gorm:"foreignKey:TileID;constraint:OnUpdate:CASCADE,OnDelete:CASCADE;" json:"tile"`
+}
+
+func (t *Terrain) ToDTO() dto.Terrain {
+	return dto.Terrain{
+		ID:       t.Tile.ID,
+		X:        t.X,
+		Y:        t.Y,
+		Type:     t.Tile.Type,
+		Walkable: t.Tile.Walkable,
+		ImageURL: t.Tile.ImageURL,
+	}
 }

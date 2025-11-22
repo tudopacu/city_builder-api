@@ -25,5 +25,5 @@ func GetMap(c *gin.Context) {
 		c.JSON(http.StatusNotFound, gin.H{"error": "map not found"})
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"map": mapModel})
+	c.JSON(http.StatusOK, gin.H{"map": mapModel.ToDTO()})
 }

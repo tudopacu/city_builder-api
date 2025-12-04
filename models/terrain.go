@@ -14,6 +14,11 @@ type Terrain struct {
 	X int `gorm:"not null" json:"x"`
 	Y int `gorm:"not null" json:"y"`
 
+	Walkable bool `gorm:"not null;default:true" json:"walkable"`
+
+	SetX int `gorm:"not null" json:"set_x"`
+	SetY int `gorm:"not null" json:"set_y"`
+
 	// Unique index on (map_id, x, y)
 	// GORM syntax: give the same index name to group fields together
 	// and mark as unique
@@ -28,16 +33,17 @@ type Terrain struct {
 
 	// Associations
 	//Map  Map  `gorm:"foreignKey:MapID;constraint:OnUpdate:CASCADE,OnDelete:CASCADE;" json:"map"`
-	Tile Tile `gorm:"foreignKey:TileID;constraint:OnUpdate:CASCADE,OnDelete:CASCADE;" json:"tile"`
+	Tile Tile `gorm:"foreignKey:TileID;constraint:OnUpdate:CASCADE,OnDelete:CASCADE;" json:"tile.go"`
 }
 
 func (t *Terrain) ToDTO() dto.Terrain {
 	return dto.Terrain{
-		ID:       t.Tile.ID,
+		TileId:   t.Tile.ID,
 		X:        t.X,
 		Y:        t.Y,
 		Type:     t.Tile.Type,
-		Walkable: t.Tile.Walkable,
-		ImageURL: t.Tile.ImageURL,
+		Walkable: t.Walkable,
+		SetX:     t.SetX,
+		SetY:     t.SetY,
 	}
 }

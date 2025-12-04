@@ -1,6 +1,7 @@
 package controllers
 
 import (
+	"API/api/services"
 	"API/database"
 	"API/models"
 	"github.com/gin-gonic/gin"
@@ -26,4 +27,14 @@ func GetMap(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"map": mapModel.ToDTO()})
+}
+
+func GetTiles(c *gin.Context) {
+	tiles, err := services.GetTiles()
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "tiles not found"})
+		return
+	}
+
+	c.JSON(http.StatusOK, tiles)
 }

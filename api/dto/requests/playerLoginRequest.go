@@ -1,4 +1,4 @@
-package dto
+package requests
 
 type PlayerLoginRequest struct {
 	Username string `json:"username"`

@@ -2,6 +2,8 @@ package services
 
 import (
 	"API/api/dto"
+	"API/api/dto/requests"
+	"API/api/dto/responses"
 	"API/authentication"
 	"API/database"
 	"API/models"
@@ -14,21 +16,21 @@ import (
 	"time"
 )
 
-func Register(request dto.PlayerRegistrationRequest) (int, dto.PlayerRegistrationResponse) {
+func Register(request requests.PlayerRegistrationRequest) (int, responses.PlayerRegistrationResponse) {
 	request.Username = strings.TrimSpace(request.Username)
 	if request.Username == "" || request.Password == "" || request.Email == "" {
-		return http.StatusBadRequest, dto.PlayerRegistrationResponse{Error: "Invalid request"}
+		return http.StatusBadRequest, responses.PlayerRegistrationResponse{Error: "Invalid request"}
 	}
 
 	_, err := mail.ParseAddress(request.Email)
 
 	if err != nil {
-		return http.StatusBadRequest, dto.PlayerRegistrationResponse{Error: "Invalid email format"}
+		return http.StatusBadRequest, responses.PlayerRegistrationResponse{Error: "Invalid email format"}
 	}
 
 	pwHash, err := bcrypt.GenerateFromPassword([]byte(request.Password), bcrypt.DefaultCost)
 	if err != nil {
-		return http.StatusInternalServerError, dto.PlayerRegistrationResponse{Error: "Internal error"}
+		return http.StatusInternalServerError, responses.PlayerRegistrationResponse{Error: "Internal error"}
 	}
 
 	player := &models.Player{
@@ -39,23 +41,23 @@ func Register(request dto.PlayerRegistrationRequest) (int, dto.PlayerRegistratio
 
 	if err := database.DB.Create(player).Error; err != nil {
 		if strings.Contains(err.Error(), "Duplicate") {
-			return http.StatusConflict, dto.PlayerRegistrationResponse{Error: "Player already exists"}
+			return http.StatusConflict, responses.PlayerRegistrationResponse{Error: "Player already exists"}
 		}
-		return http.StatusInternalServerError, dto.PlayerRegistrationResponse{Error: "Failed to create player"}
+		return http.StatusInternalServerError, responses.PlayerRegistrationResponse{Error: "Failed to create player"}
 	}
 
-	return http.StatusOK, dto.PlayerRegistrationResponse{Player: &dto.Player{Id: player.ID, Username: player.Username}}
+	return http.StatusOK, responses.PlayerRegistrationResponse{Player: &dto.Player{Id: player.ID, Username: player.Username}}
 }
 
-func Login(request dto.PlayerLoginRequest) (int, dto.PlayerLoginResponse, *http.Cookie) {
+func Login(request requests.PlayerLoginRequest) (int, responses.PlayerLoginResponse, *http.Cookie) {
 	var player models.Player
 
 	if err := database.DB.Where("username = ?", request.Username).First(&player).Error; err != nil {
-		return http.StatusUnauthorized, dto.PlayerLoginResponse{Error: "Invalid credentials"}, nil
+		return http.StatusUnauthorized, responses.PlayerLoginResponse{Error: "Invalid credentials"}, nil
 	}
 
 	if err := bcrypt.CompareHashAndPassword([]byte(player.Password), []byte(request.Password)); err != nil {
-		return http.StatusUnauthorized, dto.PlayerLoginResponse{Error: "Invalid credentials"}, nil
+		return http.StatusUnauthorized, responses.PlayerLoginResponse{Error: "Invalid credentials"}, nil
 	}
 
 	expiresAt := time.Now().Add(24 * time.Hour)
@@ -67,7 +69,7 @@ func Login(request dto.PlayerLoginRequest) (int, dto.PlayerLoginResponse, *http.
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
 	signed, err := token.SignedString(authentication.JwtSecret)
 	if err != nil {
-		return http.StatusInternalServerError, dto.PlayerLoginResponse{Error: "Failed to create token"}, nil
+		return http.StatusInternalServerError, responses.PlayerLoginResponse{Error: "Failed to create token"}, nil
 	}
 
 	//todo this cookie needs to change on https and in production, set Secure to true and SAmeSite to proper value
@@ -82,27 +84,27 @@ func Login(request dto.PlayerLoginRequest) (int, dto.PlayerLoginResponse, *http.
 		MaxAge:   3600 * 24,
 	}
 
-	return http.StatusOK, dto.PlayerLoginResponse{Player: &dto.Player{Id: player.ID, Username: player.Username}}, cookie
+	return http.StatusOK, responses.PlayerLoginResponse{Player: &dto.Player{Id: player.ID, Username: player.Username}}, cookie
 }
 
-func PlayerByCookie(cookie *http.Cookie) (int, dto.PlayerByCookieResponse) {
+func PlayerByCookie(cookie *http.Cookie) (int, responses.PlayerByCookieResponse) {
 	token, err := jwt.ParseWithClaims(cookie.Value, &jwt.RegisteredClaims{}, func(token *jwt.Token) (interface{}, error) {
 		return authentication.JwtSecret, nil
 	})
 
 	if err != nil || !token.Valid {
-		return http.StatusUnauthorized, dto.PlayerByCookieResponse{Error: "Invalid token"}
+		return http.StatusUnauthorized, responses.PlayerByCookieResponse{Error: "Invalid token"}
 	}
 
 	claims, ok := token.Claims.(*jwt.RegisteredClaims)
 	if !ok {
-		return http.StatusUnauthorized, dto.PlayerByCookieResponse{Error: "Invalid token claims"}
+		return http.StatusUnauthorized, responses.PlayerByCookieResponse{Error: "Invalid token claims"}
 	}
 
 	var player models.Player
 	if err := database.DB.First(&player, claims.Subject).Error; err != nil {
-		return http.StatusNotFound, dto.PlayerByCookieResponse{Error: "Player not found"}
+		return http.StatusNotFound, responses.PlayerByCookieResponse{Error: "Player not found"}
 	}
 
-	return http.StatusOK, dto.PlayerByCookieResponse{Player: &dto.Player{Id: player.ID, Username: player.Username}}
+	return http.StatusOK, responses.PlayerByCookieResponse{Player: &dto.Player{Id: player.ID, Username: player.Username}}
 }

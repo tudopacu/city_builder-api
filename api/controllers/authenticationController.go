@@ -1,7 +1,7 @@
 package controllers
 
 import (
-	"API/api/dto"
+	"API/api/dto/requests"
 	"API/api/services"
 	"github.com/gin-gonic/gin"
 	"net/http"
@@ -9,7 +9,7 @@ import (
 )
 
 func HandleRegister(c *gin.Context) {
-	var request dto.PlayerRegistrationRequest
+	var request requests.PlayerRegistrationRequest
 
 	if err := c.BindJSON(&request); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request"})
@@ -22,7 +22,7 @@ func HandleRegister(c *gin.Context) {
 }
 
 func HandleLogin(c *gin.Context) {
-	var request dto.PlayerLoginRequest
+	var request requests.PlayerLoginRequest
 	if err := c.BindJSON(&request); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request"})
 		return

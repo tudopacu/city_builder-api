@@ -6,7 +6,10 @@ import (
 	"API/models"
 	"github.com/gin-gonic/gin"
 	"net/http"
+	"strconv"
 )
+
+//TODO: move queries to service layer
 
 func GetMaps(c *gin.Context) {
 	var maps []models.Map
@@ -19,20 +22,26 @@ func GetMaps(c *gin.Context) {
 }
 
 func GetMap(c *gin.Context) {
-	id := c.Param("id")
-	var mapModel models.Map
-
-	if err := database.DB.Preload("Terrains.Tile").First(&mapModel, id).Error; err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "map not found"})
+	mapId, err := strconv.ParseUint(c.Param("id"), 10, 32)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid map_id"})
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"map": mapModel.ToDTO()})
+
+	mapDto, err := services.GetMapByID(uint(mapId))
+
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"map": mapDto})
 }
 
 func GetTiles(c *gin.Context) {
 	tiles, err := services.GetTiles()
 	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "tiles not found"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err})
 		return
 	}
 

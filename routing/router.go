@@ -37,6 +37,7 @@ func InitRouter() {
 
 	auth := r.Group("/").Use(s.AuthMiddleware())
 	auth.GET("/maps", controllers.GetMaps)
+	auth.GET("/news", controllers.GetNews)
 
 	addr := ":5000"
 	log.Printf("listening on %s", addr)

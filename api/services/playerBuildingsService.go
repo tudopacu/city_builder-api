@@ -42,6 +42,12 @@ func GetPlayerBuildings(playerId uint, mapId uint) ([]dto.PlayerBuilding, error)
 }
 
 func AddPlayerBuilding(request requests.AddBuildingRequest) (int, gin.H) {
+	// Validate coordinates are non-negative
+	if request.X < 0 || request.Y < 0 {
+		log.Default().Println(fmt.Sprintf("invalid coordinates: x=%d, y=%d", request.X, request.Y))
+		return http.StatusBadRequest, gin.H{"error": "coordinates must be non-negative"}
+	}
+
 	// 1. Validate building exists and get its dimensions
 	var building models.Building
 	if err := database.DB.First(&building, request.BuildingID).Error; err != nil {
@@ -57,18 +63,46 @@ func AddPlayerBuilding(request requests.AddBuildingRequest) (int, gin.H) {
 	}
 
 	// 3. Check if tiles at the building position are grass or dirt
+	// Build list of coordinates to check
+	var coordinates []struct {
+		X int
+		Y int
+	}
 	for x := request.X; x < request.X+building.Width; x++ {
 		for y := request.Y; y < request.Y+building.Length; y++ {
-			var terrain models.Terrain
-			if err := database.DB.Preload("Tile").Where("map_id = ? AND x = ? AND y = ?", request.MapID, x, y).First(&terrain).Error; err != nil {
-				log.Default().Println(fmt.Sprintf("terrain not found at position (%d, %d) on map_id %d", x, y, request.MapID), err)
-				return http.StatusBadRequest, gin.H{"error": fmt.Sprintf("terrain not found at position (%d, %d)", x, y)}
-			}
+			coordinates = append(coordinates, struct {
+				X int
+				Y int
+			}{X: x, Y: y})
+		}
+	}
 
-			if terrain.Tile.Type != "grass" && terrain.Tile.Type != "dirt" {
-				log.Default().Println(fmt.Sprintf("invalid tile type %s at position (%d, %d)", terrain.Tile.Type, x, y))
-				return http.StatusBadRequest, gin.H{"error": fmt.Sprintf("building can only be placed on grass or dirt tiles, found %s at position (%d, %d)", terrain.Tile.Type, x, y)}
-			}
+	// Fetch all terrains in one query
+	var terrains []models.Terrain
+	query := database.DB.Preload("Tile").Where("map_id = ?", request.MapID)
+	
+	// Build OR conditions for all coordinates
+	orConditions := database.DB.Where("1 = 0") // Start with false condition
+	for _, coord := range coordinates {
+		orConditions = orConditions.Or("(x = ? AND y = ?)", coord.X, coord.Y)
+	}
+	
+	if err := query.Where(orConditions).Find(&terrains).Error; err != nil {
+		log.Default().Println(fmt.Sprintf("failed to fetch terrains for building placement on map_id %d", request.MapID), err)
+		return http.StatusInternalServerError, gin.H{"error": "failed to validate terrain"}
+	}
+
+	// Verify we found all expected tiles
+	if len(terrains) != len(coordinates) {
+		log.Default().Println(fmt.Sprintf("not all terrain tiles found for building placement, expected %d, found %d", len(coordinates), len(terrains)))
+		return http.StatusBadRequest, gin.H{"error": "some terrain tiles are missing"}
+	}
+
+	// Validate all tiles are grass or dirt
+	for _, terrain := range terrains {
+		if terrain.Tile.Type != "grass" && terrain.Tile.Type != "dirt" {
+			log.Default().Println(fmt.Sprintf("invalid tile type %s at position (%d, %d)", terrain.Tile.Type, terrain.X, terrain.Y))
+			return http.StatusBadRequest, gin.H{"error": fmt.Sprintf("building can only be placed on grass or dirt tiles, found %s at position (%d, %d)", terrain.Tile.Type, terrain.X, terrain.Y)}
 		}
 	}
 

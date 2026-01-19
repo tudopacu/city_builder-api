@@ -106,10 +106,10 @@ func AddPlayerBuilding(request requests.AddBuildingRequest) (int, gin.H) {
 		}
 	}
 
-	// 4. Check if building overlaps with existing buildings
+	// 4. Check if building overlaps with existing buildings on the map
 	var existingBuildings []models.PlayerBuilding
-	if err := database.DB.Preload("Building").Where("player_id = ? AND map_id = ?", request.PlayerID, request.MapID).Find(&existingBuildings).Error; err != nil {
-		log.Default().Println(fmt.Sprintf("failed to fetch existing buildings for player_id %d on map_id %d", request.PlayerID, request.MapID), err)
+	if err := database.DB.Preload("Building").Where("map_id = ?", request.MapID).Find(&existingBuildings).Error; err != nil {
+		log.Default().Println(fmt.Sprintf("failed to fetch existing buildings on map_id %d", request.MapID), err)
 		return http.StatusInternalServerError, gin.H{"error": "failed to validate building placement"}
 	}
 

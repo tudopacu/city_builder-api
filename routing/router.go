@@ -36,9 +36,10 @@ func InitRouter() {
 	r.POST("/login", controllers.HandleLogin)
 	r.POST("/logout", controllers.HandleLogout)
 
+	r.GET("/news", controllers.GetNews)
+
 	auth := r.Group("/").Use(s.AuthMiddleware())
 	auth.GET("/maps", controllers.GetMaps)
-	auth.GET("/news", controllers.GetNews)
 
 	addr := ":5000"
 	log.Printf("listening on %s", addr)

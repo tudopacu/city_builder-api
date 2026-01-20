@@ -22,9 +22,8 @@ func GetPlayerBuildings(playerId uint, mapId uint) ([]dto.PlayerBuilding, error)
 		Find(&playerBuildingModels, "player_id = ? AND map_id = ?", playerId, mapId).
 		Error; err != nil {
 
-		log.Default().Println(fmt.Sprintf(
-			"failed to fetch player buildings for player_id %d on map_id %d",
-			playerId, mapId), err)
+		log.Default().Printf("failed to fetch player buildings for player_id %d on map_id %d: %s",
+			playerId, mapId, err)
 
 		return []dto.PlayerBuilding{}, fmt.Errorf(
 			"failed to fetch player buildings for player_id %d on map_id %d",
@@ -97,20 +96,20 @@ func validateTerrainForBuilding(mapID uint, x, y, width, length int) error {
 	}
 
 	if err := query.Where(orConditions).Find(&terrains).Error; err != nil {
-		log.Default().Println(fmt.Sprintf("failed to fetch terrains for building placement on map_id %d", mapID), err)
+		log.Default().Printf("failed to fetch terrains for building placement on map_id %d: %s", mapID, err)
 		return fmt.Errorf("failed to validate terrain")
 	}
 
 	// Verify we found all expected tiles
 	if len(terrains) != len(coordinates) {
-		log.Default().Println(fmt.Sprintf("not all terrain tiles found for building placement, expected %d, found %d", len(coordinates), len(terrains)))
+		log.Default().Printf("not all terrain tiles found for building placement, expected %d, found %d", len(coordinates), len(terrains))
 		return fmt.Errorf("some terrain tiles are missing")
 	}
 
 	// Validate all tiles are grass or dirt
 	for _, terrain := range terrains {
 		if terrain.Tile.Type != "grass" && terrain.Tile.Type != "dirt" {
-			log.Default().Println(fmt.Sprintf("invalid tile type %s at position (%d, %d)", terrain.Tile.Type, terrain.X, terrain.Y))
+			log.Default().Printf("invalid tile type %s at position (%d, %d)", terrain.Tile.Type, terrain.X, terrain.Y)
 			return fmt.Errorf("building can only be placed on grass or dirt tiles, found %s at position (%d, %d)", terrain.Tile.Type, terrain.X, terrain.Y)
 		}
 	}
@@ -121,7 +120,7 @@ func validateTerrainForBuilding(mapID uint, x, y, width, length int) error {
 func checkBuildingOverlap(mapID uint, x, y, width, length int) error {
 	var existingBuildings []models.PlayerBuilding
 	if err := database.DB.Preload("Building").Where("map_id = ?", mapID).Find(&existingBuildings).Error; err != nil {
-		log.Default().Println(fmt.Sprintf("failed to fetch existing buildings on map_id %d", mapID), err)
+		log.Default().Printf("failed to fetch existing buildings on map_id %d: %s", mapID, err)
 		return fmt.Errorf("failed to validate building placement")
 	}
 
@@ -137,7 +136,7 @@ func checkBuildingOverlap(mapID uint, x, y, width, length int) error {
 		yOverlap := y <= existingBuildingMaxY && newBuildingMaxY >= existingBuilding.Y
 
 		if xOverlap && yOverlap {
-			log.Default().Println(fmt.Sprintf("building overlaps with existing building at position (%d, %d)", existingBuilding.X, existingBuilding.Y))
+			log.Default().Printf("building overlaps with existing building at position (%d, %d)", existingBuilding.X, existingBuilding.Y)
 			return fmt.Errorf("building overlaps with an existing building")
 		}
 	}
@@ -156,7 +155,7 @@ func createPlayerBuilding(request requests.AddBuildingRequest, buildingLevelID u
 	}
 
 	if err := database.DB.Create(&playerBuilding).Error; err != nil {
-		log.Default().Println(fmt.Sprintf("failed to create player building for player_id %d", request.PlayerID), err)
+		log.Default().Printf("failed to create player building for player_id %d: %s", request.PlayerID, err)
 		return nil, fmt.Errorf("failed to place building")
 	}
 
@@ -165,7 +164,7 @@ func createPlayerBuilding(request requests.AddBuildingRequest, buildingLevelID u
 
 func loadPlayerBuildingWithAssociations(playerBuilding *models.PlayerBuilding) error {
 	if err := database.DB.Preload("Building").Preload("Building.Category").Preload("BuildingLevel").First(playerBuilding, playerBuilding.ID).Error; err != nil {
-		log.Default().Println(fmt.Sprintf("failed to load created building with ID %d", playerBuilding.ID), err)
+		log.Default().Printf("failed to load created building with ID %d: %s", playerBuilding.ID, err)
 		return fmt.Errorf("failed to load building details")
 	}
 	return nil

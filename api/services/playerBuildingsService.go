@@ -42,7 +42,7 @@ func GetPlayerBuildings(playerId uint, mapId uint) ([]dto.PlayerBuilding, error)
 
 func validateCoordinates(x, y int) error {
 	if x < 0 || y < 0 {
-		log.Default().Println(fmt.Sprintf("invalid coordinates: x=%d, y=%d", x, y))
+		log.Default().Printf("invalid coordinates: x=%d, y=%d", x, y)
 		return fmt.Errorf("coordinates must be non-negative")
 	}
 	return nil
@@ -51,13 +51,13 @@ func validateCoordinates(x, y int) error {
 func getBuildingWithLevel(buildingID uint) (*models.Building, *models.BuildingLevel, error) {
 	var building models.Building
 	if err := database.DB.First(&building, buildingID).Error; err != nil {
-		log.Default().Println(fmt.Sprintf("building not found, building_id %d", buildingID), err)
+		log.Default().Printf("building not found, building_id %d: %s", buildingID, err)
 		return nil, nil, fmt.Errorf("building not found")
 	}
 
 	var buildingLevel models.BuildingLevel
 	if err := database.DB.Where("building_id = ? AND level = ?", buildingID, 1).First(&buildingLevel).Error; err != nil {
-		log.Default().Println(fmt.Sprintf("building level 1 not found for building_id %d", buildingID), err)
+		log.Default().Printf("building level 1 not found for building_id %d: %s", buildingID, err)
 		return nil, nil, fmt.Errorf("building level not found")
 	}
 

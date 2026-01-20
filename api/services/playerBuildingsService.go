@@ -3,13 +3,12 @@ package services
 import (
 	"API/api/dto"
 	"API/api/dto/requests"
+	"API/api/dto/responses"
 	"API/database"
 	"API/models"
 	"fmt"
 	"log"
 	"net/http"
-
-	"github.com/gin-gonic/gin"
 )
 
 func GetPlayerBuildings(playerId uint, mapId uint) ([]dto.PlayerBuilding, error) {
@@ -41,25 +40,25 @@ func GetPlayerBuildings(playerId uint, mapId uint) ([]dto.PlayerBuilding, error)
 	return playerBuildingDTOs, nil
 }
 
-func AddPlayerBuilding(request requests.AddBuildingRequest) (int, gin.H) {
+func AddPlayerBuilding(request requests.AddBuildingRequest) (int, responses.AddPlayerBuildingResponse) {
 	// Validate coordinates are non-negative
 	if request.X < 0 || request.Y < 0 {
 		log.Default().Println(fmt.Sprintf("invalid coordinates: x=%d, y=%d", request.X, request.Y))
-		return http.StatusBadRequest, gin.H{"error": "coordinates must be non-negative"}
+		return http.StatusBadRequest, responses.AddPlayerBuildingResponse{Error: "coordinates must be non-negative"}
 	}
 
 	// 1. Validate building exists and get its dimensions
 	var building models.Building
 	if err := database.DB.First(&building, request.BuildingID).Error; err != nil {
 		log.Default().Println(fmt.Sprintf("building not found, building_id %d", request.BuildingID), err)
-		return http.StatusNotFound, gin.H{"error": "building not found"}
+		return http.StatusNotFound, responses.AddPlayerBuildingResponse{Error: "building not found"}
 	}
 
 	// 2. Get the first building level (level 1) for the building
 	var buildingLevel models.BuildingLevel
 	if err := database.DB.Where("building_id = ? AND level = ?", request.BuildingID, 1).First(&buildingLevel).Error; err != nil {
 		log.Default().Println(fmt.Sprintf("building level 1 not found for building_id %d", request.BuildingID), err)
-		return http.StatusNotFound, gin.H{"error": "building level not found"}
+		return http.StatusNotFound, responses.AddPlayerBuildingResponse{Error: "building level not found"}
 	}
 
 	// 3. Check if tiles at the building position are grass or dirt
@@ -89,20 +88,20 @@ func AddPlayerBuilding(request requests.AddBuildingRequest) (int, gin.H) {
 	
 	if err := query.Where(orConditions).Find(&terrains).Error; err != nil {
 		log.Default().Println(fmt.Sprintf("failed to fetch terrains for building placement on map_id %d", request.MapID), err)
-		return http.StatusInternalServerError, gin.H{"error": "failed to validate terrain"}
+		return http.StatusInternalServerError, responses.AddPlayerBuildingResponse{Error: "failed to validate terrain"}
 	}
 
 	// Verify we found all expected tiles
 	if len(terrains) != len(coordinates) {
 		log.Default().Println(fmt.Sprintf("not all terrain tiles found for building placement, expected %d, found %d", len(coordinates), len(terrains)))
-		return http.StatusBadRequest, gin.H{"error": "some terrain tiles are missing"}
+		return http.StatusBadRequest, responses.AddPlayerBuildingResponse{Error: "some terrain tiles are missing"}
 	}
 
 	// Validate all tiles are grass or dirt
 	for _, terrain := range terrains {
 		if terrain.Tile.Type != "grass" && terrain.Tile.Type != "dirt" {
 			log.Default().Println(fmt.Sprintf("invalid tile type %s at position (%d, %d)", terrain.Tile.Type, terrain.X, terrain.Y))
-			return http.StatusBadRequest, gin.H{"error": fmt.Sprintf("building can only be placed on grass or dirt tiles, found %s at position (%d, %d)", terrain.Tile.Type, terrain.X, terrain.Y)}
+			return http.StatusBadRequest, responses.AddPlayerBuildingResponse{Error: fmt.Sprintf("building can only be placed on grass or dirt tiles, found %s at position (%d, %d)", terrain.Tile.Type, terrain.X, terrain.Y)}
 		}
 	}
 
@@ -110,7 +109,7 @@ func AddPlayerBuilding(request requests.AddBuildingRequest) (int, gin.H) {
 	var existingBuildings []models.PlayerBuilding
 	if err := database.DB.Preload("Building").Where("map_id = ?", request.MapID).Find(&existingBuildings).Error; err != nil {
 		log.Default().Println(fmt.Sprintf("failed to fetch existing buildings on map_id %d", request.MapID), err)
-		return http.StatusInternalServerError, gin.H{"error": "failed to validate building placement"}
+		return http.StatusInternalServerError, responses.AddPlayerBuildingResponse{Error: "failed to validate building placement"}
 	}
 
 	for _, existingBuilding := range existingBuildings {
@@ -126,7 +125,7 @@ func AddPlayerBuilding(request requests.AddBuildingRequest) (int, gin.H) {
 
 		if xOverlap && yOverlap {
 			log.Default().Println(fmt.Sprintf("building overlaps with existing building at position (%d, %d)", existingBuilding.X, existingBuilding.Y))
-			return http.StatusBadRequest, gin.H{"error": "building overlaps with an existing building"}
+			return http.StatusBadRequest, responses.AddPlayerBuildingResponse{Error: "building overlaps with an existing building"}
 		}
 	}
 
@@ -142,14 +141,15 @@ func AddPlayerBuilding(request requests.AddBuildingRequest) (int, gin.H) {
 
 	if err := database.DB.Create(&playerBuilding).Error; err != nil {
 		log.Default().Println(fmt.Sprintf("failed to create player building for player_id %d", request.PlayerID), err)
-		return http.StatusInternalServerError, gin.H{"error": "failed to place building"}
+		return http.StatusInternalServerError, responses.AddPlayerBuildingResponse{Error: "failed to place building"}
 	}
 
 	// 6. Load the created building with its associations for the response
 	if err := database.DB.Preload("Building").Preload("Building.Category").Preload("BuildingLevel").First(&playerBuilding, playerBuilding.ID).Error; err != nil {
 		log.Default().Println(fmt.Sprintf("failed to load created building with ID %d", playerBuilding.ID), err)
-		return http.StatusInternalServerError, gin.H{"error": "failed to load building details"}
+		return http.StatusInternalServerError, responses.AddPlayerBuildingResponse{Error: "failed to load building details"}
 	}
 
-	return http.StatusCreated, gin.H{"player_building": playerBuilding.ToDTO()}
+	playerBuildingDTO := playerBuilding.ToDTO()
+	return http.StatusCreated, responses.AddPlayerBuildingResponse{PlayerBuilding: &playerBuildingDTO}
 }

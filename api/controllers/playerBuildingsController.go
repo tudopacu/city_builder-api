@@ -1,6 +1,7 @@
 package controllers
 
 import (
+	"API/api/dto/requests"
 	"API/api/services"
 	"github.com/gin-gonic/gin"
 	"net/http"
@@ -28,4 +29,16 @@ func GetPlayerBuildings(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{"player_buildings": playerBuildingDTOs})
+}
+
+func AddPlayerBuilding(c *gin.Context) {
+	var request requests.AddBuildingRequest
+
+	if err := c.BindJSON(&request); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request"})
+		return
+	}
+
+	statusCode, response := services.AddPlayerBuilding(request)
+	c.JSON(statusCode, response)
 }

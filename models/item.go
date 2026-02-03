@@ -1,0 +1,21 @@
+package models
+
+import "time"
+
+type Item struct {
+	ID          uint      `gorm:"primaryKey"`
+	Name        string    `gorm:"not null"`
+	Description *string   `gorm:"type:text"`
+	Type        string    `gorm:"size:50;not null;index:idx_items_type"`
+	IconURL     *string   `gorm:"type:varchar(255)"`
+	IsTradeable bool      `gorm:"not null;default:true"`
+	CreatedAt   time.Time `gorm:"autoCreateTime"`
+	UpdatedAt   *time.Time
+
+	Recipes      []ItemRecipe      `gorm:"foreignKey:ItemID"`
+	RecipeInputs []ItemRecipeInput `gorm:"foreignKey:InputItemID"`
+}
+
+func (Item) TableName() string {
+	return "items"
+}

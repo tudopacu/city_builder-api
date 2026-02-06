@@ -12,8 +12,10 @@ type Item struct {
 	CreatedAt   time.Time `gorm:"autoCreateTime"`
 	UpdatedAt   *time.Time
 
-	Recipes      []ItemRecipe      `gorm:"foreignKey:ItemID"`
-	RecipeInputs []ItemRecipeInput `gorm:"foreignKey:InputItemID"`
+	Recipes                  []ItemRecipe               `gorm:"foreignKey:ItemID"`
+	RecipeInputs             []ItemRecipeInput          `gorm:"foreignKey:InputItemID"`
+	BuildingConstructionCosts []BuildingConstructionCost `gorm:"foreignKey:ItemID"`
+	BuildingProductions      []BuildingProduction       `gorm:"foreignKey:ItemID"`
 }
 
 func (Item) TableName() string {

@@ -43,10 +43,10 @@ func GetNews(c *gin.Context) {
 	totalPages := (totalCount + int64(pageSize) - 1) / int64(pageSize)
 
 	c.JSON(http.StatusOK, gin.H{
-		"news":        news,
-		"page":        page,
-		"pageSize":    pageSize,
-		"totalCount":  totalCount,
-		"totalPages":  totalPages,
+		"news":       news,
+		"page":       page,
+		"pageSize":   pageSize,
+		"totalCount": totalCount,
+		"totalPages": totalPages,
 	})
 }

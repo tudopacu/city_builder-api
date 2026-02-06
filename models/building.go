@@ -16,10 +16,10 @@ type Building struct {
 	CreatedAt          time.Time `gorm:"autoCreateTime"`
 	UpdatedAt          *time.Time
 
-	Category          BuildingCategory            `gorm:"foreignKey:BuildingCategoryID;references:ID;constraint:OnUpdate:CASCADE,OnDelete:CASCADE;"`
-	Levels            []BuildingLevel             `gorm:"foreignKey:BuildingID"`
-	ConstructionCosts []BuildingConstructionCost  `gorm:"foreignKey:BuildingID"`
-	Productions       []BuildingProduction        `gorm:"foreignKey:BuildingID"`
+	Category          BuildingCategory           `gorm:"foreignKey:BuildingCategoryID;references:ID;constraint:OnUpdate:CASCADE,OnDelete:CASCADE;"`
+	Levels            []BuildingLevel            `gorm:"foreignKey:BuildingID"`
+	ConstructionCosts []BuildingConstructionCost `gorm:"foreignKey:BuildingID"`
+	Productions       []BuildingProduction       `gorm:"foreignKey:BuildingID"`
 }
 
 func (Building) TableName() string {

@@ -16,6 +16,7 @@ type Item struct {
 	RecipeInputs              []ItemRecipeInput          `gorm:"foreignKey:InputItemID"`
 	BuildingConstructionCosts []BuildingConstructionCost `gorm:"foreignKey:ItemID"`
 	BuildingProductions       []BuildingProduction       `gorm:"foreignKey:ItemID"`
+	PlayerInventoryItems      []PlayerInventoryItem      `gorm:"foreignKey:ItemID"`
 }
 
 func (Item) TableName() string {

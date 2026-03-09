@@ -19,6 +19,7 @@ type PlayerBuilding struct {
 	Building      Building      `gorm:"foreignKey:BuildingID;references:ID;constraint:OnUpdate:CASCADE,OnDelete:CASCADE;"`
 	BuildingLevel BuildingLevel `gorm:"foreignKey:BuildingLevelID;references:ID;constraint:OnUpdate:CASCADE,OnDelete:CASCADE;"`
 	Map           Map           `gorm:"constraint:OnUpdate:CASCADE,OnDelete:CASCADE;"`
+	PlayerInventories []PlayerInventory `gorm:"foreignKey:PlayerBuildingID"`
 }
 
 func (PlayerBuilding) TableName() string {

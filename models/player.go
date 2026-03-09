@@ -20,4 +20,6 @@ type Player struct {
 	CreatedAt   time.Time `gorm:"autoCreateTime" json:"created_at"`
 	LastLoginAt time.Time `gorm:"autoUpdateTime" json:"last_login_at"`
 	Status      string    `gorm:"type:enum('active','banned','suspended');not null;default:'active'"`
+
+	PlayerInventories []PlayerInventory `gorm:"foreignKey:PlayerID"`
 }

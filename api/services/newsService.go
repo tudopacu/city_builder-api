@@ -4,11 +4,33 @@ import (
 	"API/api/dto"
 	"API/database"
 	"API/models"
+	redisClient "API/redis"
+	"context"
+	"encoding/json"
 	"fmt"
 	"log"
+	"time"
 )
 
+const newsCacheTTL = 5 * time.Minute
+
+type newsCacheEntry struct {
+	News       []dto.News `json:"news"`
+	TotalCount int64      `json:"total_count"`
+}
+
 func GetNews(page, pageSize int) ([]dto.News, int64, error) {
+	ctx := context.Background()
+	cacheKey := fmt.Sprintf("news:page:%d:size:%d", page, pageSize)
+
+	cached, err := redisClient.RDB.Get(ctx, cacheKey).Result()
+	if err == nil {
+		var entry newsCacheEntry
+		if jsonErr := json.Unmarshal([]byte(cached), &entry); jsonErr == nil {
+			return entry.News, entry.TotalCount, nil
+		}
+	}
+
 	var newsModels []models.News
 	var totalCount int64
 
@@ -30,6 +52,11 @@ func GetNews(page, pageSize int) ([]dto.News, int64, error) {
 	var dtoNews []dto.News
 	for _, news := range newsModels {
 		dtoNews = append(dtoNews, news.ToDTO())
+	}
+
+	entry := newsCacheEntry{News: dtoNews, TotalCount: totalCount}
+	if data, jsonErr := json.Marshal(entry); jsonErr == nil {
+		redisClient.RDB.Set(ctx, cacheKey, data, newsCacheTTL)
 	}
 
 	return dtoNews, totalCount, nil

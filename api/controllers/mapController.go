@@ -2,19 +2,14 @@ package controllers
 
 import (
 	"API/api/services"
-	"API/database"
-	"API/models"
 	"github.com/gin-gonic/gin"
 	"net/http"
 	"strconv"
 )
 
-//TODO: move queries to service layer
-
 func GetMaps(c *gin.Context) {
-	var maps []models.Map
-
-	if err := database.DB.Find(&maps).Error; err != nil {
+	maps, err := services.GetAllMaps()
+	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "no maps found"})
 		return
 	}

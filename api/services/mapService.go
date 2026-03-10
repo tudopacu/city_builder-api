@@ -4,11 +4,30 @@ import (
 	"API/api/dto"
 	"API/database"
 	"API/models"
+	redisClient "API/redis"
+	"context"
+	"encoding/json"
 	"fmt"
 	"log"
+	"time"
+)
+
+const (
+	tilesCacheKey = "tiles:all"
+	mapCacheTTL   = 10 * time.Minute
 )
 
 func GetTiles() ([]dto.Tile, error) {
+	ctx := context.Background()
+
+	cached, err := redisClient.RDB.Get(ctx, tilesCacheKey).Result()
+	if err == nil {
+		var dtoTiles []dto.Tile
+		if jsonErr := json.Unmarshal([]byte(cached), &dtoTiles); jsonErr == nil {
+			return dtoTiles, nil
+		}
+	}
+
 	var tiles []models.Tile
 
 	if err := database.DB.Find(&tiles).Error; err != nil {
@@ -21,10 +40,25 @@ func GetTiles() ([]dto.Tile, error) {
 		dtoTiles = append(dtoTiles, tile.ToDTO())
 	}
 
+	if data, jsonErr := json.Marshal(dtoTiles); jsonErr == nil {
+		redisClient.RDB.Set(ctx, tilesCacheKey, data, mapCacheTTL)
+	}
+
 	return dtoTiles, nil
 }
 
 func GetMapByID(mapId uint) (*dto.Map, error) {
+	ctx := context.Background()
+	cacheKey := fmt.Sprintf("map:%d", mapId)
+
+	cached, err := redisClient.RDB.Get(ctx, cacheKey).Result()
+	if err == nil {
+		var dtoMap dto.Map
+		if jsonErr := json.Unmarshal([]byte(cached), &dtoMap); jsonErr == nil {
+			return &dtoMap, nil
+		}
+	}
+
 	var mapModel models.Map
 
 	if err := database.DB.Preload("Terrains.Tile").First(&mapModel, mapId).Error; err != nil {
@@ -33,5 +67,10 @@ func GetMapByID(mapId uint) (*dto.Map, error) {
 	}
 
 	dtoMap := mapModel.ToDTO()
+
+	if data, jsonErr := json.Marshal(dtoMap); jsonErr == nil {
+		redisClient.RDB.Set(ctx, cacheKey, data, mapCacheTTL)
+	}
+
 	return &dtoMap, nil
 }

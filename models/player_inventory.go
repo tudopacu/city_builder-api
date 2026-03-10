@@ -1,6 +1,9 @@
 package models
 
-import "time"
+import (
+	"API/api/dto"
+	"time"
+)
 
 type PlayerInventory struct {
 	ID               uint      `gorm:"primaryKey"`
@@ -17,4 +20,18 @@ type PlayerInventory struct {
 
 func (PlayerInventory) TableName() string {
 	return "player_inventories"
+}
+
+func (pi PlayerInventory) ToDTO() dto.PlayerInventory {
+	playerBuildingDTO := pi.PlayerBuilding.ToDTO()
+	items := make([]dto.PlayerInventoryItem, 0, len(pi.InventoryItems))
+	for _, item := range pi.InventoryItems {
+		items = append(items, item.ToDTO())
+	}
+	return dto.PlayerInventory{
+		ID:             pi.ID,
+		PlayerBuilding: playerBuildingDTO,
+		Capacity:       pi.Capacity,
+		Items:          items,
+	}
 }

@@ -1,6 +1,9 @@
 package models
 
-import "time"
+import (
+	"API/api/dto"
+	"time"
+)
 
 type PlayerInventoryItem struct {
 	ID                uint      `gorm:"primaryKey"`
@@ -16,4 +19,12 @@ type PlayerInventoryItem struct {
 
 func (PlayerInventoryItem) TableName() string {
 	return "player_inventory_items"
+}
+
+func (i PlayerInventoryItem) ToDTO() dto.PlayerInventoryItem {
+	return dto.PlayerInventoryItem{
+		ID:       i.ID,
+		Item:     i.Item.ToDTO(),
+		Quantity: i.Quantity,
+	}
 }

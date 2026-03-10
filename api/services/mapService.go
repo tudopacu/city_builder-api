@@ -30,7 +30,7 @@ func GetAllMaps() ([]dto.Map, error) {
 	}
 
 	var maps []models.Map
-	if err := database.DB.Find(&maps).Error; err != nil {
+	if err := database.DB.Preload("Terrains.Tile").Find(&maps).Error; err != nil {
 		log.Default().Println("failed to fetch maps", err)
 		return nil, fmt.Errorf("failed to fetch maps")
 	}

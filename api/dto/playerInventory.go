@@ -1,8 +1,15 @@
 package dto
 
+type PlayerInventoryItem struct {
+	ItemID   uint   `json:"item_id"`
+	Name     string `json:"name"`
+	Type     string `json:"type"`
+	Quantity int    `json:"quantity"`
+}
+
 type PlayerInventory struct {
-	ID             uint                  `json:"id"`
-	PlayerBuilding PlayerBuilding        `json:"player_building"`
-	Capacity       int                   `json:"capacity"`
-	Items          []PlayerInventoryItem `json:"items"`
+	PlayerID      uint                  `json:"player_id"`
+	Items         []PlayerInventoryItem `json:"items"`
+	TotalCapacity int                   `json:"total_capacity"`
+	TotalItems    int                   `json:"total_items"`
 }

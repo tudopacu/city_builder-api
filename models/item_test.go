@@ -30,6 +30,34 @@ func TestItemModel(t *testing.T) {
 	}
 }
 
+func TestItemToDTO(t *testing.T) {
+	iconURL := "http://example.com/icon.png"
+	item := Item{
+		ID:      1,
+		Name:    "Test Item",
+		Type:    "resource",
+		IconURL: &iconURL,
+	}
+
+	itemDTO := item.ToDTO()
+
+	if itemDTO.ID != 1 {
+		t.Errorf("Expected ID to be 1, got %d", itemDTO.ID)
+	}
+
+	if itemDTO.Name != "Test Item" {
+		t.Errorf("Expected Name to be 'Test Item', got '%s'", itemDTO.Name)
+	}
+
+	if itemDTO.Type != "resource" {
+		t.Errorf("Expected Type to be 'resource', got '%s'", itemDTO.Type)
+	}
+
+	if itemDTO.IconURL == nil || *itemDTO.IconURL != iconURL {
+		t.Errorf("Expected IconURL to be '%s', got %v", iconURL, itemDTO.IconURL)
+	}
+}
+
 func TestItemRecipeModel(t *testing.T) {
 	recipe := ItemRecipe{
 		ItemID:                1,

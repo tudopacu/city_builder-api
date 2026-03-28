@@ -4,11 +4,30 @@ import (
 	"API/api/dto"
 	"API/database"
 	"API/models"
+	redisClient "API/redis"
+	"context"
+	"encoding/json"
 	"fmt"
 	"log"
+	"time"
+)
+
+const (
+	buildingsCacheKey = "buildings:all"
+	buildingsCacheTTL = 10 * time.Minute
 )
 
 func GetAllBuildings() ([]dto.BuildingWithDetails, error) {
+	ctx := context.Background()
+
+	cached, err := redisClient.RDB.Get(ctx, buildingsCacheKey).Result()
+	if err == nil {
+		var buildingsWithDetails []dto.BuildingWithDetails
+		if jsonErr := json.Unmarshal([]byte(cached), &buildingsWithDetails); jsonErr == nil {
+			return buildingsWithDetails, nil
+		}
+	}
+
 	var buildings []models.Building
 
 	// Preload related data: Category, ConstructionCosts with Item, and Productions with Item
@@ -55,6 +74,10 @@ func GetAllBuildings() ([]dto.BuildingWithDetails, error) {
 			Costs:            costs,
 			Productions:      productions,
 		})
+	}
+
+	if data, jsonErr := json.Marshal(buildingsWithDetails); jsonErr == nil {
+		redisClient.RDB.Set(ctx, buildingsCacheKey, data, buildingsCacheTTL)
 	}
 
 	return buildingsWithDetails, nil

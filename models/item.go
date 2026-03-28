@@ -1,6 +1,9 @@
 package models
 
-import "time"
+import (
+	"API/api/dto"
+	"time"
+)
 
 type Item struct {
 	ID          uint      `gorm:"primaryKey"`
@@ -16,8 +19,18 @@ type Item struct {
 	RecipeInputs              []ItemRecipeInput          `gorm:"foreignKey:InputItemID"`
 	BuildingConstructionCosts []BuildingConstructionCost `gorm:"foreignKey:ItemID"`
 	BuildingProductions       []BuildingProduction       `gorm:"foreignKey:ItemID"`
+	PlayerInventoryItems      []PlayerInventoryItem      `gorm:"foreignKey:ItemID"`
 }
 
 func (Item) TableName() string {
 	return "items"
+}
+
+func (i Item) ToDTO() dto.Item {
+	return dto.Item{
+		ID:      i.ID,
+		Name:    i.Name,
+		Type:    i.Type,
+		IconURL: i.IconURL,
+	}
 }

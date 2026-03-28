@@ -26,6 +26,7 @@ func InitRouter() {
 	game := r.Group("/game")
 	game.GET("/get_player", controllers.GetPlayer)
 	game.GET("/get_player_buildings/:player_id/:map_id", controllers.GetPlayerBuildings)
+	game.GET("/get_player_inventory/:player_id", controllers.GetPlayerInventory)
 	game.POST("/add_building", controllers.AddPlayerBuilding)
 
 	game.GET("/map/:id", controllers.GetMap)

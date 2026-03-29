@@ -2,6 +2,7 @@ package controllers
 
 import (
 	"API/api/dto/requests"
+	"API/api/dto/responses"
 	"API/api/services"
 	"github.com/gin-gonic/gin"
 	"net/http"
@@ -15,13 +16,13 @@ func GetPlayerInventory(c *gin.Context) {
 		return
 	}
 
-	inventoryDTOs, err := services.GetPlayerInventories(uint(playerID))
+	inventoryDTOs, totalQuantity, totalCapacity, err := services.GetPlayerInventories(uint(playerID))
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"player_inventories": inventoryDTOs})
+	c.JSON(http.StatusOK, gin.H{"player_inventory": responses.PlayerInventoryResponse{PlayerInventories: inventoryDTOs, TotalQuantity: totalQuantity, TotalCapacity: totalCapacity}})
 }
 
 func AddInventoryItem(c *gin.Context) {

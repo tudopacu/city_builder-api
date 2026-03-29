@@ -11,7 +11,7 @@ import (
 	"net/http"
 )
 
-func GetPlayerInventories(playerID uint) ([]dto.PlayerInventory, error) {
+func GetPlayerInventories(playerID uint) ([]dto.PlayerInventory, int, int, error) {
 	var inventories []models.PlayerInventory
 
 	if err := database.DB.
@@ -25,7 +25,7 @@ func GetPlayerInventories(playerID uint) ([]dto.PlayerInventory, error) {
 		Error; err != nil {
 
 		log.Default().Printf("failed to fetch player inventories for player_id %d: %s", playerID, err)
-		return []dto.PlayerInventory{}, fmt.Errorf("failed to fetch player inventories for player_id %d", playerID)
+		return []dto.PlayerInventory{}, 0, 0, fmt.Errorf("failed to fetch player inventories for player_id %d", playerID)
 	}
 
 	inventoryDTOs := make([]dto.PlayerInventory, 0, len(inventories))
@@ -33,7 +33,9 @@ func GetPlayerInventories(playerID uint) ([]dto.PlayerInventory, error) {
 		inventoryDTOs = append(inventoryDTOs, inventory.ToDTO())
 	}
 
-	return inventoryDTOs, nil
+	totalQuantity, totalCapacity := CalculateTotalInventoryStats(inventoryDTOs)
+
+	return inventoryDTOs, totalQuantity, totalCapacity, nil
 }
 
 func loadInventoryWithAssociations(inventoryID uint) (*models.PlayerInventory, error) {
@@ -123,4 +125,14 @@ func AddInventoryItem(request requests.AddInventoryItemRequest) (int, responses.
 
 	inventoryDTO := updatedInventory.ToDTO()
 	return http.StatusOK, responses.AddInventoryItemResponse{PlayerInventory: &inventoryDTO}
+}
+
+func CalculateTotalInventoryStats(inventories []dto.PlayerInventory) (totalQuantity int, totalCapacity int) {
+	for _, inventory := range inventories {
+		totalCapacity += inventory.Capacity
+		for _, item := range inventory.Items {
+			totalQuantity += item.Quantity
+		}
+	}
+	return totalQuantity, totalCapacity
 }

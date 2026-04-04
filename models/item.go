@@ -28,9 +28,11 @@ func (Item) TableName() string {
 
 func (i Item) ToDTO() dto.Item {
 	return dto.Item{
-		ID:      i.ID,
-		Name:    i.Name,
-		Type:    i.Type,
-		IconURL: i.IconURL,
+		ID:          i.ID,
+		Name:        i.Name,
+		Description: i.Description,
+		Type:        i.Type,
+		IconURL:     i.IconURL,
+		IsTradeable: i.IsTradeable,
 	}
 }

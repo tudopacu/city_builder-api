@@ -51,12 +51,8 @@ func TestPlayerInventoryItemToDTO(t *testing.T) {
 		t.Errorf("Expected Quantity to be 10, got %d", itemDTO.Quantity)
 	}
 
-	if itemDTO.Item.ID != 3 {
-		t.Errorf("Expected Item.ID to be 3, got %d", itemDTO.Item.ID)
-	}
-
-	if itemDTO.Item.Name != "Wood" {
-		t.Errorf("Expected Item.Name to be 'Wood', got '%s'", itemDTO.Item.Name)
+	if itemDTO.ItemID != 3 {
+		t.Errorf("Expected ItemID to be 3, got %d", itemDTO.ItemID)
 	}
 }
 
@@ -115,8 +111,8 @@ func TestPlayerInventoryToDTO(t *testing.T) {
 		t.Errorf("Expected Capacity to be 50, got %d", inventoryDTO.Capacity)
 	}
 
-	if inventoryDTO.PlayerBuilding.ID != 2 {
-		t.Errorf("Expected PlayerBuilding.ID to be 2, got %d", inventoryDTO.PlayerBuilding.ID)
+	if inventoryDTO.PlayerBuildingID != 2 {
+		t.Errorf("Expected PlayerBuilding.ID to be 2, got %d", inventoryDTO.PlayerBuildingID)
 	}
 
 	if len(inventoryDTO.Items) != 1 {
@@ -127,7 +123,7 @@ func TestPlayerInventoryToDTO(t *testing.T) {
 		t.Errorf("Expected Items[0].ID to be 10, got %d", inventoryDTO.Items[0].ID)
 	}
 
-	if inventoryDTO.Items[0].Item.Name != "Stone" {
-		t.Errorf("Expected Items[0].Item.Name to be 'Stone', got '%s'", inventoryDTO.Items[0].Item.Name)
+	if inventoryDTO.Items[0].ItemID != 3 {
+		t.Errorf("Expected Items[0].ItemID to be 3, got '%s'", inventoryDTO.Items[0].ItemID)
 	}
 }

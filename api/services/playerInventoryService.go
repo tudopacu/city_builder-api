@@ -15,10 +15,6 @@ func GetPlayerInventories(playerID uint) ([]dto.PlayerInventory, int, int, error
 	var inventories []models.PlayerInventory
 
 	if err := database.DB.
-		Preload("PlayerBuilding").
-		Preload("PlayerBuilding.Building").
-		Preload("PlayerBuilding.Building.Category").
-		Preload("PlayerBuilding.BuildingLevel").
 		Preload("InventoryItems").
 		Preload("InventoryItems.Item").
 		Find(&inventories, "player_id = ?", playerID).

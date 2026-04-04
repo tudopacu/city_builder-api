@@ -2,6 +2,6 @@ package dto
 
 type PlayerInventoryItem struct {
 	ID       uint `json:"id"`
-	Item     Item `json:"item"`
+	ItemID   uint `json:"item_id"`
 	Quantity int  `json:"quantity"`
 }

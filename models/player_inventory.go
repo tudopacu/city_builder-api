@@ -13,9 +13,9 @@ type PlayerInventory struct {
 	CreatedAt        time.Time `gorm:"autoCreateTime"`
 	UpdatedAt        *time.Time
 
-	Player          Player          `gorm:"foreignKey:PlayerID;references:ID;constraint:OnUpdate:CASCADE,OnDelete:CASCADE;"`
-	PlayerBuilding  PlayerBuilding  `gorm:"foreignKey:PlayerBuildingID;references:ID;constraint:OnUpdate:CASCADE,OnDelete:CASCADE;"`
-	InventoryItems  []PlayerInventoryItem `gorm:"foreignKey:PlayerInventoryID"`
+	Player         Player                `gorm:"foreignKey:PlayerID;references:ID;constraint:OnUpdate:CASCADE,OnDelete:CASCADE;"`
+	PlayerBuilding PlayerBuilding        `gorm:"foreignKey:PlayerBuildingID;references:ID;constraint:OnUpdate:CASCADE,OnDelete:CASCADE;"`
+	InventoryItems []PlayerInventoryItem `gorm:"foreignKey:PlayerInventoryID"`
 }
 
 func (PlayerInventory) TableName() string {
@@ -23,15 +23,14 @@ func (PlayerInventory) TableName() string {
 }
 
 func (pi PlayerInventory) ToDTO() dto.PlayerInventory {
-	playerBuildingDTO := pi.PlayerBuilding.ToDTO()
 	items := make([]dto.PlayerInventoryItem, 0, len(pi.InventoryItems))
 	for _, item := range pi.InventoryItems {
 		items = append(items, item.ToDTO())
 	}
 	return dto.PlayerInventory{
-		ID:             pi.ID,
-		PlayerBuilding: playerBuildingDTO,
-		Capacity:       pi.Capacity,
-		Items:          items,
+		ID:               pi.ID,
+		PlayerBuildingID: pi.PlayerBuildingID,
+		Capacity:         pi.Capacity,
+		Items:            items,
 	}
 }

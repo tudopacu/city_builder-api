@@ -24,7 +24,7 @@ func (PlayerInventoryItem) TableName() string {
 func (i PlayerInventoryItem) ToDTO() dto.PlayerInventoryItem {
 	return dto.PlayerInventoryItem{
 		ID:       i.ID,
-		Item:     i.Item.ToDTO(),
+		ItemID:   i.Item.ID,
 		Quantity: i.Quantity,
 	}
 }

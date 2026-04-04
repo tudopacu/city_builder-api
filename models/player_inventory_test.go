@@ -124,6 +124,6 @@ func TestPlayerInventoryToDTO(t *testing.T) {
 	}
 
 	if inventoryDTO.Items[0].ItemID != 3 {
-		t.Errorf("Expected Items[0].ItemID to be 3, got '%s'", inventoryDTO.Items[0].ItemID)
+		t.Errorf("Expected Items[0].ItemID to be 3, got '%d'", inventoryDTO.Items[0].ItemID)
 	}
 }

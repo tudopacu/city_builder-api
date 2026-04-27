@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"github.com/golang-jwt/jwt/v5"
 	"golang.org/x/crypto/bcrypt"
+	"gorm.io/gorm"
 	"net/http"
 	"net/mail"
 	"strings"
@@ -39,7 +40,9 @@ func Register(request requests.PlayerRegistrationRequest) (int, responses.Player
 		Email:    request.Email,
 	}
 
-	if err := database.DB.Create(player).Error; err != nil {
+	if err := database.DB.Transaction(func(tx *gorm.DB) error {
+		return tx.Create(player).Error
+	}); err != nil {
 		if strings.Contains(err.Error(), "Duplicate") {
 			return http.StatusConflict, responses.PlayerRegistrationResponse{Error: "Player already exists"}
 		}

@@ -9,6 +9,8 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+
+	"gorm.io/gorm"
 )
 
 func GetPlayerInventories(playerID uint) ([]dto.PlayerInventory, int, int, error) {
@@ -95,22 +97,27 @@ func AddInventoryItem(request requests.AddInventoryItemRequest) (int, responses.
 	}
 
 	// Save: update existing entry or create a new one
-	if existingEntry != nil {
-		existingEntry.Quantity += request.Quantity
-		if err := database.DB.Save(existingEntry).Error; err != nil {
-			log.Default().Printf("failed to update inventory item for inventory_id %d, item_id %d: %s", request.InventoryID, request.ItemID, err)
-			return http.StatusInternalServerError, responses.AddInventoryItemResponse{Error: "failed to update inventory item"}
+	if err := database.DB.Transaction(func(tx *gorm.DB) error {
+		if existingEntry != nil {
+			existingEntry.Quantity += request.Quantity
+			if err := tx.Save(existingEntry).Error; err != nil {
+				log.Default().Printf("failed to update inventory item for inventory_id %d, item_id %d: %s", request.InventoryID, request.ItemID, err)
+				return fmt.Errorf("failed to update inventory item")
+			}
+		} else {
+			newEntry := models.PlayerInventoryItem{
+				PlayerInventoryID: request.InventoryID,
+				ItemID:            request.ItemID,
+				Quantity:          request.Quantity,
+			}
+			if err := tx.Create(&newEntry).Error; err != nil {
+				log.Default().Printf("failed to create inventory item for inventory_id %d, item_id %d: %s", request.InventoryID, request.ItemID, err)
+				return fmt.Errorf("failed to add inventory item")
+			}
 		}
-	} else {
-		newEntry := models.PlayerInventoryItem{
-			PlayerInventoryID: request.InventoryID,
-			ItemID:            request.ItemID,
-			Quantity:          request.Quantity,
-		}
-		if err := database.DB.Create(&newEntry).Error; err != nil {
-			log.Default().Printf("failed to create inventory item for inventory_id %d, item_id %d: %s", request.InventoryID, request.ItemID, err)
-			return http.StatusInternalServerError, responses.AddInventoryItemResponse{Error: "failed to add inventory item"}
-		}
+		return nil
+	}); err != nil {
+		return http.StatusInternalServerError, responses.AddInventoryItemResponse{Error: err.Error()}
 	}
 
 	// Return the updated inventory

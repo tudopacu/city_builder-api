@@ -1,15 +1,20 @@
 package requests
 
+type IntersectionInput struct {
+	X int `json:"x" binding:"required"`
+	Y int `json:"y" binding:"required"`
+}
+
+type RoadTypeInput struct {
+	ID uint `json:"id" binding:"required"`
+}
+
 type RoadData struct {
-	StartX     int  `json:"start_x" binding:"required"`
-	StartY     int  `json:"start_y" binding:"required"`
-	EndX       int  `json:"end_x" binding:"required"`
-	EndY       int  `json:"end_y" binding:"required"`
-	RoadTypeID uint `json:"road_type_id" binding:"required"`
+	StartIntersection IntersectionInput `json:"start_intersection" binding:"required"`
+	EndIntersection   IntersectionInput `json:"end_intersection" binding:"required"`
+	RoadType          RoadTypeInput     `json:"road_type" binding:"required"`
 }
 
 type AddRoadsRequest struct {
-	PlayerID uint       `json:"player_id" binding:"required"`
-	MapID    uint       `json:"map_id" binding:"required"`
-	Roads    []RoadData `json:"roads" binding:"required,min=1"`
+	Roads []RoadData `json:"roads" binding:"required,min=1"`
 }

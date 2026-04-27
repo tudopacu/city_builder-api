@@ -33,39 +33,39 @@ func GetRoadsByPlayerAndMap(playerID uint, mapID uint) ([]dto.Road, error) {
 	return roadDTOs, nil
 }
 
-func AddRoads(request requests.AddRoadsRequest) (int, responses.AddRoadsResponse) {
+func AddRoads(playerID uint, mapID uint, request requests.AddRoadsRequest) (int, responses.AddRoadsResponse) {
 	createdRoadDTOs := make([]dto.Road, 0, len(request.Roads))
 
 	for _, roadData := range request.Roads {
 		startIntersection := models.Intersection{
-			PlayerID: &request.PlayerID,
-			MapID:    &request.MapID,
-			X:        roadData.StartX,
-			Y:        roadData.StartY,
+			PlayerID: &playerID,
+			MapID:    &mapID,
+			X:        roadData.StartIntersection.X,
+			Y:        roadData.StartIntersection.Y,
 		}
 		if err := database.DB.Create(&startIntersection).Error; err != nil {
-			log.Default().Printf("failed to create start intersection for player_id %d: %s", request.PlayerID, err)
-			return http.StatusInternalServerError, responses.AddRoadsResponse{Error: fmt.Sprintf("failed to create start intersection at (%d, %d)", roadData.StartX, roadData.StartY)}
+			log.Default().Printf("failed to create start intersection for player_id %d: %s", playerID, err)
+			return http.StatusInternalServerError, responses.AddRoadsResponse{Error: fmt.Sprintf("failed to create start intersection at (%d, %d)", roadData.StartIntersection.X, roadData.StartIntersection.Y)}
 		}
 
 		endIntersection := models.Intersection{
-			PlayerID: &request.PlayerID,
-			MapID:    &request.MapID,
-			X:        roadData.EndX,
-			Y:        roadData.EndY,
+			PlayerID: &playerID,
+			MapID:    &mapID,
+			X:        roadData.EndIntersection.X,
+			Y:        roadData.EndIntersection.Y,
 		}
 		if err := database.DB.Create(&endIntersection).Error; err != nil {
-			log.Default().Printf("failed to create end intersection for player_id %d: %s", request.PlayerID, err)
-			return http.StatusInternalServerError, responses.AddRoadsResponse{Error: fmt.Sprintf("failed to create end intersection at (%d, %d)", roadData.EndX, roadData.EndY)}
+			log.Default().Printf("failed to create end intersection for player_id %d: %s", playerID, err)
+			return http.StatusInternalServerError, responses.AddRoadsResponse{Error: fmt.Sprintf("failed to create end intersection at (%d, %d)", roadData.EndIntersection.X, roadData.EndIntersection.Y)}
 		}
 
 		road := models.Road{
 			StartIntersectionID: &startIntersection.ID,
 			EndIntersectionID:   &endIntersection.ID,
-			RoadTypeID:          &roadData.RoadTypeID,
+			RoadTypeID:          &roadData.RoadType.ID,
 		}
 		if err := database.DB.Create(&road).Error; err != nil {
-			log.Default().Printf("failed to create road for player_id %d: %s", request.PlayerID, err)
+			log.Default().Printf("failed to create road for player_id %d: %s", playerID, err)
 			return http.StatusInternalServerError, responses.AddRoadsResponse{Error: "failed to create road"}
 		}
 

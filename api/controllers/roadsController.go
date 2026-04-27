@@ -31,6 +31,18 @@ func GetRoads(c *gin.Context) {
 }
 
 func AddRoads(c *gin.Context) {
+	playerID, err := strconv.ParseUint(c.Param("player_id"), 10, 32)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid player_id"})
+		return
+	}
+
+	mapID, err := strconv.ParseUint(c.Param("map_id"), 10, 32)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid map_id"})
+		return
+	}
+
 	var request requests.AddRoadsRequest
 
 	if err := c.BindJSON(&request); err != nil {
@@ -38,6 +50,6 @@ func AddRoads(c *gin.Context) {
 		return
 	}
 
-	statusCode, response := services.AddRoads(request)
+	statusCode, response := services.AddRoads(uint(playerID), uint(mapID), request)
 	c.JSON(statusCode, response)
 }

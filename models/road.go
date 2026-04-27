@@ -23,22 +23,26 @@ func (Road) TableName() string {
 }
 
 func (r Road) ToDTO() dto.Road {
+	startIntersection := dto.Intersection{
+		ID: r.StartIntersection.ID,
+		X:  r.StartIntersection.X,
+		Y:  r.StartIntersection.Y,
+	}
+	endIntersection := dto.Intersection{
+		ID: r.EndIntersection.ID,
+		X:  r.EndIntersection.X,
+		Y:  r.EndIntersection.Y,
+	}
+	roadType := dto.RoadType{
+		ID:       r.RoadType.ID,
+		Type:     r.RoadType.Type,
+		ImageURL: r.RoadType.ImageURL,
+	}
+
 	return dto.Road{
-		ID: r.ID,
-		StartIntersection: dto.Intersection{
-			ID: r.StartIntersection.ID,
-			X:  r.StartIntersection.X,
-			Y:  r.StartIntersection.Y,
-		},
-		EndIntersection: dto.Intersection{
-			ID: r.EndIntersection.ID,
-			X:  r.EndIntersection.X,
-			Y:  r.EndIntersection.Y,
-		},
-		RoadType: dto.RoadType{
-			ID:       r.RoadType.ID,
-			Type:     r.RoadType.Type,
-			ImageURL: r.RoadType.ImageURL,
-		},
+		ID:                r.ID,
+		StartIntersection: startIntersection,
+		EndIntersection:   endIntersection,
+		RoadType:          roadType,
 	}
 }

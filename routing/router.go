@@ -38,7 +38,7 @@ func InitRouter() {
 
 	game.GET("/items", controllers.GetItems)
 
-	game.GET("/roads", controllers.GetRoads)
+	game.GET("/roads/:player_id/:map_id", controllers.GetRoads)
 
 	game.GET("/inventory/:player_id", controllers.GetPlayerInventory)
 

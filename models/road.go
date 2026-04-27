@@ -6,14 +6,16 @@ import (
 )
 
 type Road struct {
-	ID          uint       `gorm:"primaryKey"`
-	Name        string     `gorm:"not null"`
-	ImageURL    *string    `gorm:"type:varchar(255)" json:"image_url,omitempty"`
-	Description *string    `gorm:"type:text"`
-	Width       int        `gorm:"not null"`
-	Length      int        `gorm:"not null"`
-	CreatedAt   time.Time  `gorm:"autoCreateTime"`
-	UpdatedAt   *time.Time
+	ID                  uint       `gorm:"primaryKey"`
+	StartIntersectionID *uint
+	EndIntersectionID   *uint
+	RoadTypeID          *uint
+	CreatedAt           time.Time  `gorm:"autoCreateTime"`
+	UpdatedAt           *time.Time
+
+	StartIntersection Intersection `gorm:"foreignKey:StartIntersectionID;references:ID;constraint:OnUpdate:CASCADE,OnDelete:CASCADE;"`
+	EndIntersection   Intersection `gorm:"foreignKey:EndIntersectionID;references:ID;constraint:OnUpdate:CASCADE,OnDelete:CASCADE;"`
+	RoadType          RoadType     `gorm:"foreignKey:RoadTypeID;references:ID;constraint:OnUpdate:CASCADE,OnDelete:CASCADE;"`
 }
 
 func (Road) TableName() string {
@@ -22,11 +24,21 @@ func (Road) TableName() string {
 
 func (r Road) ToDTO() dto.Road {
 	return dto.Road{
-		ID:          r.ID,
-		Name:        r.Name,
-		ImageURL:    r.ImageURL,
-		Description: r.Description,
-		Width:       r.Width,
-		Length:      r.Length,
+		ID: r.ID,
+		StartIntersection: dto.Intersection{
+			ID: r.StartIntersection.ID,
+			X:  r.StartIntersection.X,
+			Y:  r.StartIntersection.Y,
+		},
+		EndIntersection: dto.Intersection{
+			ID: r.EndIntersection.ID,
+			X:  r.EndIntersection.X,
+			Y:  r.EndIntersection.Y,
+		},
+		RoadType: dto.RoadType{
+			ID:       r.RoadType.ID,
+			Type:     r.RoadType.Type,
+			ImageURL: r.RoadType.ImageURL,
+		},
 	}
 }

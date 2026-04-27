@@ -4,43 +4,27 @@ import (
 	"API/api/dto"
 	"API/database"
 	"API/models"
-	redisClient "API/redis"
-	"context"
-	"encoding/json"
 	"fmt"
 	"log"
-	"time"
 )
 
-const (
-	roadsCacheKey = "roads:all"
-	roadsCacheTTL = 10 * time.Minute
-)
-
-func GetAllRoads() ([]dto.Road, error) {
-	ctx := context.Background()
-
-	cached, err := redisClient.RDB.Get(ctx, roadsCacheKey).Result()
-	if err == nil {
-		var roads []dto.Road
-		if jsonErr := json.Unmarshal([]byte(cached), &roads); jsonErr == nil {
-			return roads, nil
-		}
-	}
-
+func GetRoadsByPlayerAndMap(playerID uint, mapID uint) ([]dto.Road, error) {
 	var roads []models.Road
-	if err := database.DB.Find(&roads).Error; err != nil {
-		log.Default().Println("failed to fetch roads", err)
-		return nil, fmt.Errorf("failed to fetch roads")
+
+	if err := database.DB.
+		Preload("StartIntersection").
+		Preload("EndIntersection").
+		Preload("RoadType").
+		Joins("JOIN intersections ON intersections.id = roads.start_intersection_id").
+		Where("intersections.player_id = ? AND intersections.map_id = ?", playerID, mapID).
+		Find(&roads).Error; err != nil {
+		log.Default().Printf("failed to fetch roads for player_id %d on map_id %d: %s", playerID, mapID, err)
+		return nil, fmt.Errorf("failed to fetch roads for player_id %d on map_id %d", playerID, mapID)
 	}
 
-	var roadDTOs []dto.Road
+	roadDTOs := make([]dto.Road, 0, len(roads))
 	for _, road := range roads {
 		roadDTOs = append(roadDTOs, road.ToDTO())
-	}
-
-	if data, jsonErr := json.Marshal(roadDTOs); jsonErr == nil {
-		redisClient.RDB.Set(ctx, roadsCacheKey, data, roadsCacheTTL)
 	}
 
 	return roadDTOs, nil

@@ -1,10 +1,20 @@
 package dto
 
+type Intersection struct {
+	ID uint `json:"id"`
+	X  int  `json:"x"`
+	Y  int  `json:"y"`
+}
+
+type RoadType struct {
+	ID       uint    `json:"id"`
+	Type     string  `json:"type"`
+	ImageURL *string `json:"image_url,omitempty"`
+}
+
 type Road struct {
-	ID          uint    `json:"id"`
-	Name        string  `json:"name"`
-	ImageURL    *string `json:"image_url,omitempty"`
-	Description *string `json:"description,omitempty"`
-	Width       int     `json:"width"`
-	Length      int     `json:"length"`
+	ID                uint         `json:"id"`
+	StartIntersection Intersection `json:"start_intersection"`
+	EndIntersection   Intersection `json:"end_intersection"`
+	RoadType          RoadType     `json:"road_type"`
 }

@@ -1,6 +1,7 @@
 package controllers
 
 import (
+	"API/api/dto/requests"
 	"API/api/services"
 	"github.com/gin-gonic/gin"
 	"net/http"
@@ -27,4 +28,16 @@ func GetRoads(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{"roads": roads})
+}
+
+func AddRoads(c *gin.Context) {
+	var request requests.AddRoadsRequest
+
+	if err := c.BindJSON(&request); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request"})
+		return
+	}
+
+	statusCode, response := services.AddRoads(request)
+	c.JSON(statusCode, response)
 }

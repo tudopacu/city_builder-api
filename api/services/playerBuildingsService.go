@@ -170,6 +170,21 @@ func loadPlayerBuildingWithAssociations(playerBuilding *models.PlayerBuilding) e
 	return nil
 }
 
+func DeletePlayerBuilding(playerBuildingID uint) (int, error) {
+	var playerBuilding models.PlayerBuilding
+	if err := database.DB.First(&playerBuilding, playerBuildingID).Error; err != nil {
+		log.Default().Printf("player building not found, id %d: %s", playerBuildingID, err)
+		return http.StatusNotFound, fmt.Errorf("player building not found")
+	}
+
+	if err := database.DB.Delete(&playerBuilding).Error; err != nil {
+		log.Default().Printf("failed to delete player building id %d: %s", playerBuildingID, err)
+		return http.StatusInternalServerError, fmt.Errorf("failed to delete player building")
+	}
+
+	return http.StatusOK, nil
+}
+
 func AddPlayerBuilding(request requests.AddBuildingRequest) (int, responses.AddPlayerBuildingResponse) {
 	// Validate coordinates are non-negative
 	if err := validateCoordinates(request.X, request.Y); err != nil {

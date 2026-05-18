@@ -31,6 +31,22 @@ func GetPlayerBuildings(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"player_buildings": playerBuildingDTOs})
 }
 
+func DeletePlayerBuilding(c *gin.Context) {
+	playerBuildingID, err := strconv.ParseUint(c.Param("player_building_id"), 10, 32)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid player_building_id"})
+		return
+	}
+
+	statusCode, serviceErr := services.DeletePlayerBuilding(uint(playerBuildingID))
+	if serviceErr != nil {
+		c.JSON(statusCode, gin.H{"error": serviceErr.Error()})
+		return
+	}
+
+	c.JSON(statusCode, gin.H{"message": "player building deleted successfully"})
+}
+
 func AddPlayerBuilding(c *gin.Context) {
 	var request requests.AddBuildingRequest
 

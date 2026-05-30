@@ -28,7 +28,7 @@ func InitRouter() {
 	game.GET("/get_player_buildings/:player_id/:map_id", controllers.GetPlayerBuildings)
 	game.GET("/get_player_inventory/:player_id", controllers.GetPlayerInventory)
 	game.POST("/add_building", controllers.AddPlayerBuilding)
-	game.DELETE("/delete_building/:player_building_id", controllers.DeletePlayerBuilding)
+	game.DELETE("/remove_player_building/:player_building_id", controllers.DeletePlayerBuilding)
 	game.POST("/add_inventory_item", controllers.AddInventoryItem)
 
 	game.GET("/map/:id", controllers.GetMap)

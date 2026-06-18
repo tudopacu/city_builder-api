@@ -1,20 +1,20 @@
 # --- Stage 1: Build the Binary ---
-FROM golang:1.22-alpine AS builder
+# CRITICAL FIX: Match or exceed your go.mod version requirement (>= 1.25.0)
+FROM golang:1.25-alpine AS builder
 
 WORKDIR /app
 
-# 1. Force the public proxy configurations
 ENV GOPROXY=https://proxy.golang.org,direct
 ENV GOPRIVATE=""
 
-# 2. CRITICAL CHANGE: Copy the entire source tree into the container FIRST
+# Copy the source tree
 COPY . .
 
-# 3. Clean up the module dependencies and download them natively inside the environment
+# Run tidy and download natively using the Go 1.25 compiler environment
 RUN go mod tidy
 RUN go mod download
 
-# 4. Compile the static binary file
+# Compile the static binary file
 RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags="-w -s" -o main .
 
 # --- Stage 2: Final Light Container ---

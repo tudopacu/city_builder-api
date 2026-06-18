@@ -4,10 +4,11 @@ import (
 	"API/api/controllers"
 	"API/authentication"
 	"API/configuration"
-	"github.com/gin-contrib/cors"
-	"github.com/gin-gonic/gin"
 	"log"
 	"time"
+
+	"github.com/gin-contrib/cors"
+	"github.com/gin-gonic/gin"
 )
 
 func InitRouter() {
@@ -52,7 +53,7 @@ func InitRouter() {
 	auth := r.Group("/").Use(s.AuthMiddleware())
 	auth.GET("/maps", controllers.GetMaps)
 
-	addr := ":5000"
+	addr := ":8081"
 	log.Printf("listening on %s", addr)
 	err := r.Run(addr)
 	if err != nil {

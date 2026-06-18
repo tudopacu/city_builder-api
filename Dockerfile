@@ -5,6 +5,11 @@ WORKDIR /app
 
 # Copy BOTH dependency configuration maps
 COPY go.mod go.sum ./
+
+# CRITICAL FIX: Explicitly force the container to bypass any cached corporate proxies
+ENV GOPROXY=https://proxy.golang.org,direct
+ENV GOPRIVATE=""
+
 RUN go mod download
 
 COPY . .

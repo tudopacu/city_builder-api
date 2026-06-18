@@ -34,9 +34,7 @@ jobs:
           driver: docker
           push: true
           tags: ghcr.io/${{ env.IMAGE_NAME }}:latest
-          # CRITICAL FIX: Forces the build container to use your server's working internet connection
-          build-args: |
-            FORCE_REBUILD=${{ github.run_id }}
+          # CRITICAL ROUTING FIX: Forces the isolated container to use your server's host internet connection
           network: host
 
   deploy-to-k8s:

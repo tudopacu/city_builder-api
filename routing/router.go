@@ -53,7 +53,7 @@ func InitRouter() {
 	auth := r.Group("/").Use(s.AuthMiddleware())
 	auth.GET("/maps", controllers.GetMaps)
 
-	addr := "0.0.0.0:8081"
+	addr := ":8081"
 	log.Printf("listening on %s", addr)
 	err := r.Run(addr)
 	if err != nil {

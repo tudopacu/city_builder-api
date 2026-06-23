@@ -33,6 +33,7 @@ jobs:
           context: .
           driver: docker
           push: true
+          no-cache: true # Ensures your latest Go code changes are always compiled fresh
           tags: ghcr.io/${{ env.IMAGE_NAME }}:latest
           # CRITICAL ROUTING FIX: Forces the isolated container to use your server's host internet connection
           network: host
@@ -47,8 +48,11 @@ jobs:
           # 1. Apply any infrastructure updates to the Go manifest
           kubectl apply -f ~/k8s/golang-api.yaml
           
-          # 2. Force Kubernetes to pull the fresh image from GHCR and cycle the pods
-          kubectl rollout restart deployment/golang-api-deployment
+          # 2. Force terminate the old pod to instantly free up physical hostPort 8081
+          kubectl scale deployment golang-api-deployment --replicas=0
           
-          # 3. Guardrail: Wait until the Gin container is fully operational before ending the job
+          # 3. Spin up the fresh pod (forces K8s to fetch the new image from GHCR due to imagePullPolicy: Always)
+          kubectl scale deployment golang-api-deployment --replicas=1
+          
+          # 4. Guardrail: Wait until the Gin container is fully operational before ending the job
           kubectl rollout status deployment/golang-api-deployment --timeout=60s

@@ -48,4 +48,4 @@ jobs:
           token: ${{ secrets.INFRA_PAT }}
           repository: tudopacu/city_builder-infrastructure
           event-type: update-image
-          client-payload: '{"app": "go-api", "image": "ghcr.io/tudopacu/city_builder-api:${{ env.IMAGE_NAME }}:${{ github.sha }}"}'
+          client-payload: '{"app": "go-api", "image": "ghcr.io/tudopacu/city_builder-api${{ env.IMAGE_NAME }}:${{ github.sha }}"}'

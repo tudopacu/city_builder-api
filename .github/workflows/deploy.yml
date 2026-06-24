@@ -34,9 +34,7 @@ jobs:
           driver: docker
           push: true
           no-cache: true
-          # TAG REFACTOR: Tag with the unique commit SHA instead of static :latest
           tags: ghcr.io/${{ env.IMAGE_NAME }}:${{ github.sha }}
-          # CRITICAL ROUTING FIX: Forces the isolated container to use your server's host internet connection
           network: host
 
   deploy-to-k8s:
@@ -44,11 +42,10 @@ jobs:
     runs-on: self-hosted
 
     steps:
-      # REFACTOR: Instead of modifying the cluster directly, ping the infrastructure repository
       - name: Notify Infrastructure Repo of New Image
         uses: peter-evans/repository-dispatch@v3
         with:
           token: ${{ secrets.INFRA_PAT }}
           repository: tudopacu/city_builder-infrastructure
           event-type: update-image
-          client-payload: '{"app": "go-api", "image": "ghcr.io/${{ env.IMAGE_NAME }}:${{ github.sha }}"}'
+          client-payload: '{"app": "go-api", "image": "ghcr.io/tudopacu/city_builder-api:${{ env.IMAGE_NAME }}:${{ github.sha }}"}'

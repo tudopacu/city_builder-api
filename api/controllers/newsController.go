@@ -2,9 +2,10 @@ package controllers
 
 import (
 	"API/api/services"
-	"github.com/gin-gonic/gin"
 	"net/http"
 	"strconv"
+
+	"github.com/gin-gonic/gin"
 )
 
 func GetNews(c *gin.Context) {
@@ -43,7 +44,7 @@ func GetNews(c *gin.Context) {
 	totalPages := (totalCount + int64(pageSize) - 1) / int64(pageSize)
 
 	c.JSON(http.StatusOK, gin.H{
-		"news":       news,
+		"news2":      news,
 		"page":       page,
 		"pageSize":   pageSize,
 		"totalCount": totalCount,

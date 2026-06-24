@@ -16,7 +16,7 @@ func InitRouter() {
 	r := gin.Default()
 
 	r.Use(cors.New(cors.Config{
-		AllowOrigins:     []string{configuration.GameURL, configuration.SiteURL},
+		AllowOrigins:     []string{configuration.MustGetEnv("GAME_URL"), configuration.MustGetEnv("SITE_URL")},
 		AllowMethods:     []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"}, //todo restrict these
 		AllowHeaders:     []string{"Origin", "Content-Type", "Authorization"},
 		ExposeHeaders:    []string{"Content-Length"},

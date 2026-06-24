@@ -1,6 +1,7 @@
 package database
 
 import (
+	"API/configuration"
 	"log"
 	"sync"
 
@@ -17,7 +18,12 @@ var DB *gorm.DB
 
 func InitDB() {
 	once.Do(func() {
-		dsn := "root:Hamham1miau!@tcp(mysql-service:3306)/game?charset=utf8mb4&parseTime=True&loc=Local"
+		host := configuration.MustGetEnv("DB_HOST")
+		dbName := configuration.MustGetEnv("DB_NAME")
+		user := configuration.MustGetEnv("DB_USER")
+		password := configuration.MustGetEnv("DB_PASSWORD")
+
+		dsn := user + ":" + password + "@tcp(" + host + ")/" + dbName + "?charset=utf8mb4&parseTime=True&loc=Local"
 
 		conn, err := gorm.Open(mysql.Open(dsn), &gorm.Config{})
 		if err != nil {

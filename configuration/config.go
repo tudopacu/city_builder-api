@@ -1,8 +1,15 @@
 package configuration
 
-const GameURL = "http://citybuilder.home.ro:8083"
-const SiteURL = "http://citybuilder.home.ro:8082"
+import (
+	"log"
+	"os"
+)
 
-const RedisAddr = "redis-service:6379"
-const RedisPassword = ""
-const RedisDB = 0
+func MustGetEnv(key string) string {
+	value := os.Getenv(key)
+	if value == "" {
+		log.Fatalf("missing required environment variable: %s", key)
+	}
+
+	return value
+}

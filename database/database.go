@@ -1,8 +1,8 @@
 package database
 
 import (
-	"API/configuration"
 	"log"
+	"os"
 	"sync"
 
 	"gorm.io/driver/mysql"
@@ -18,10 +18,10 @@ var DB *gorm.DB
 
 func InitDB() {
 	once.Do(func() {
-		host := configuration.MustGetEnv("DB_HOST")
-		dbName := configuration.MustGetEnv("DB_NAME")
-		user := configuration.MustGetEnv("DB_USER")
-		password := configuration.MustGetEnv("DB_PASSWORD")
+		host := os.Getenv("DB_HOST")
+		dbName := os.Getenv("DB_NAME")
+		user := os.Getenv("DB_USER")
+		password := os.Getenv("DB_PASSWORD")
 
 		dsn := user + ":" + password + "@tcp(" + host + ")/" + dbName + "?charset=utf8mb4&parseTime=True&loc=Local"
 

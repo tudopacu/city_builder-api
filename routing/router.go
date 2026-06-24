@@ -3,8 +3,8 @@ package routing
 import (
 	"API/api/controllers"
 	"API/authentication"
-	"API/configuration"
 	"log"
+	"os"
 	"time"
 
 	"github.com/gin-contrib/cors"
@@ -16,7 +16,7 @@ func InitRouter() {
 	r := gin.Default()
 
 	r.Use(cors.New(cors.Config{
-		AllowOrigins:     []string{configuration.MustGetEnv("GAME_URL"), configuration.MustGetEnv("SITE_URL")},
+		AllowOrigins:     []string{os.Getenv("GAME_URL"), os.Getenv("SITE_URL")},
 		AllowMethods:     []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"}, //todo restrict these
 		AllowHeaders:     []string{"Origin", "Content-Type", "Authorization"},
 		ExposeHeaders:    []string{"Content-Length"},

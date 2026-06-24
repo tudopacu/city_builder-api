@@ -1,9 +1,9 @@
 package redis
 
 import (
-	"API/configuration"
 	"context"
 	"log"
+	"os"
 	"strconv"
 	"sync"
 
@@ -19,14 +19,14 @@ var RDB *redis.Client
 
 func InitRedis() {
 	once.Do(func() {
-		db, err := strconv.Atoi(configuration.MustGetEnv("REDIS_DATABASE"))
+		db, err := strconv.Atoi(os.Getenv("REDIS_DATABASE"))
 		if err != nil {
 			log.Fatalf("failed to get redis db: %v", err)
 		}
 
 		client := redis.NewClient(&redis.Options{
-			Addr:     configuration.MustGetEnv("REDIS_HOST") + ":" + configuration.MustGetEnv("REDIS_PORT"),
-			Password: configuration.MustGetEnv("REDIS_PASSWORD"),
+			Addr:     os.Getenv("REDIS_HOST") + ":" + os.Getenv("REDIS_PORT"),
+			Password: os.Getenv("REDIS_PASSWORD"),
 			DB:       db,
 		})
 

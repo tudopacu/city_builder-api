@@ -9,6 +9,8 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+
+	"gorm.io/gorm"
 )
 
 func GetPlayerBuildings(playerId uint, mapId uint) ([]dto.PlayerBuilding, error) {
@@ -144,7 +146,7 @@ func checkBuildingOverlap(mapID uint, x, y, width, length int) error {
 	return nil
 }
 
-func createPlayerBuilding(request requests.AddBuildingRequest, buildingLevelID uint) (*models.PlayerBuilding, error) {
+func createPlayerBuilding(tx *gorm.DB, request requests.AddBuildingRequest, buildingLevelID uint) (*models.PlayerBuilding, error) {
 	playerBuilding := models.PlayerBuilding{
 		PlayerID:        request.PlayerID,
 		BuildingID:      request.BuildingID,
@@ -154,7 +156,7 @@ func createPlayerBuilding(request requests.AddBuildingRequest, buildingLevelID u
 		Y:               request.Y,
 	}
 
-	if err := database.DB.Create(&playerBuilding).Error; err != nil {
+	if err := tx.Create(&playerBuilding).Error; err != nil {
 		log.Default().Printf("failed to create player building for player_id %d: %s", request.PlayerID, err)
 		return nil, fmt.Errorf("failed to place building")
 	}
@@ -217,8 +219,12 @@ func AddPlayerBuilding(request requests.AddBuildingRequest) (int, responses.AddP
 	}
 
 	// Create the player building
-	playerBuilding, err := createPlayerBuilding(request, buildingLevel.ID)
-	if err != nil {
+	var playerBuilding *models.PlayerBuilding
+	if err := database.DB.Transaction(func(tx *gorm.DB) error {
+		var txErr error
+		playerBuilding, txErr = createPlayerBuilding(tx, request, buildingLevel.ID)
+		return txErr
+	}); err != nil {
 		return http.StatusInternalServerError, responses.AddPlayerBuildingResponse{Error: err.Error()}
 	}
 

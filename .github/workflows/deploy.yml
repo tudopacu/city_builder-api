@@ -33,8 +33,9 @@ jobs:
           context: .
           driver: docker
           push: true
-          no-cache: true # Ensures your latest Go code changes are always compiled fresh
-          tags: ghcr.io/${{ env.IMAGE_NAME }}:latest
+          no-cache: true
+          # TAG REFACTOR: Tag with the unique commit SHA instead of static :latest
+          tags: ghcr.io/${{ env.IMAGE_NAME }}:${{ github.sha }}
           # CRITICAL ROUTING FIX: Forces the isolated container to use your server's host internet connection
           network: host
 
@@ -43,16 +44,11 @@ jobs:
     runs-on: self-hosted
 
     steps:
-      - name: Deploy Manifest and Restart Pods
-        run: |
-          # 1. Apply any infrastructure updates to the Go manifest
-          kubectl apply -f ~/k8s/golang-api.yaml
-          
-          # 2. Force terminate the old pod to instantly free up physical hostPort 8081
-          kubectl scale deployment golang-api-deployment --replicas=0
-          
-          # 3. Spin up the fresh pod (forces K8s to fetch the new image from GHCR due to imagePullPolicy: Always)
-          kubectl scale deployment golang-api-deployment --replicas=1
-          
-          # 4. Guardrail: Wait until the Gin container is fully operational before ending the job
-          kubectl rollout status deployment/golang-api-deployment --timeout=60s
+      # REFACTOR: Instead of modifying the cluster directly, ping the infrastructure repository
+      - name: Notify Infrastructure Repo of New Image
+        uses: peter-evans/repository-dispatch@v3
+        with:
+          token: ${{ secrets.INFRA_PAT }}
+          repository: tudopacu/city_builder-infrastructure
+          event-type: update-image
+          client-payload: '{"app": "go-api", "image": "ghcr.io/${{ env.IMAGE_NAME }}:${{ github.sha }}"}'

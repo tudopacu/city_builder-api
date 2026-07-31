@@ -24,7 +24,10 @@ func InitRouter() {
 		MaxAge:           12 * time.Hour,
 	}))
 
-	game := r.Group("/game")
+	auth := r.Group("/").Use(s.AuthMiddleware())
+	auth.GET("/maps", controllers.GetMaps)
+
+	game := r.Group("/game").Use(s.AuthMiddleware())
 	game.GET("/get_player", controllers.GetPlayer)
 	game.GET("/get_player_buildings/:player_id/:map_id", controllers.GetPlayerBuildings)
 	game.GET("/get_player_inventory/:player_id", controllers.GetPlayerInventory)
@@ -49,9 +52,6 @@ func InitRouter() {
 	r.POST("/logout", controllers.HandleLogout)
 
 	r.GET("/news", controllers.GetNews)
-
-	auth := r.Group("/").Use(s.AuthMiddleware())
-	auth.GET("/maps", controllers.GetMaps)
 
 	addr := ":8081"
 	log.Printf("listening on %s", addr)

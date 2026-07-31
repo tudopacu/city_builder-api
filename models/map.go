@@ -8,6 +8,7 @@ import (
 type Map struct {
 	ID        uint      `gorm:"primaryKey;autoIncrement" json:"id"`
 	Name      string    `gorm:"type:varchar(255);not null" json:"name"`
+	ImageURL  *string   `gorm:"type:varchar(255)" json:"image_url,omitempty"`
 	Width     int       `gorm:"not null" json:"width"`
 	Length    int       `gorm:"not null" json:"length"`
 	CreatedAt time.Time `gorm:"autoCreateTime" json:"created_at"`
@@ -25,6 +26,7 @@ func (m *Map) ToDTO() dto.Map {
 	return dto.Map{
 		ID:       m.ID,
 		Name:     m.Name,
+		ImageURL: m.ImageURL,
 		Width:    m.Width,
 		Length:   m.Length,
 		Terrains: terrainsDTO,

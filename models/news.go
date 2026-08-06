@@ -9,6 +9,7 @@ type News struct {
 	ID        uint      `gorm:"primaryKey;autoIncrement" json:"id"`
 	Title     string    `gorm:"type:varchar(255);not null" json:"title"`
 	Content   string    `gorm:"type:text;not null" json:"content"`
+	ImageUrl  string    `gorm:"type:text;not null" json:"image_url"`
 	CreatedAt time.Time `gorm:"autoCreateTime" json:"created_at"`
 	UpdatedAt time.Time `gorm:"autoUpdateTime" json:"updated_at"`
 }
@@ -18,6 +19,7 @@ func (n *News) ToDTO() dto.News {
 		ID:        n.ID,
 		Title:     n.Title,
 		Content:   n.Content,
+		ImageUrl:  n.ImageUrl,
 		CreatedAt: n.CreatedAt,
 		UpdatedAt: n.UpdatedAt,
 	}

@@ -16,6 +16,15 @@ func StartProduction(playerID, playerBuildingID, buildingProductionID uint) (int
 		return http.StatusNotFound, fmt.Errorf("building production not found")
 	}
 
+	var existing models.BuildingCurrentProduction
+	err := database.DB.Where(
+		"player_id = ? AND player_building_id = ? AND building_production_id = ? AND status IN ('PENDING','DONE')",
+		playerID, playerBuildingID, buildingProductionID,
+	).First(&existing).Error
+	if err == nil {
+		return http.StatusConflict, fmt.Errorf("production already in progress")
+	}
+
 	endTime := time.Now().Add(time.Duration(buildingProduction.ProductionTimeSeconds) * time.Second)
 
 	entry := models.BuildingCurrentProduction{

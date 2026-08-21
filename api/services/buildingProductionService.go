@@ -10,10 +10,20 @@ import (
 )
 
 func StartProduction(playerID, playerBuildingID, buildingProductionID uint) (int, error) {
+	var playerBuilding models.PlayerBuilding
+	if err := database.DB.First(&playerBuilding, playerBuildingID).Error; err != nil {
+		log.Default().Printf("player building not found, id %d: %s", playerBuildingID, err)
+		return http.StatusNotFound, fmt.Errorf("player building not found")
+	}
+
 	var buildingProduction models.BuildingProduction
 	if err := database.DB.First(&buildingProduction, buildingProductionID).Error; err != nil {
 		log.Default().Printf("building production not found, id %d: %s", buildingProductionID, err)
 		return http.StatusNotFound, fmt.Errorf("building production not found")
+	}
+
+	if buildingProduction.BuildingID != playerBuilding.BuildingID {
+		return http.StatusBadRequest, fmt.Errorf("building production does not belong to this building")
 	}
 
 	var existing models.BuildingCurrentProduction

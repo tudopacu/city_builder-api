@@ -19,6 +19,7 @@ func GetPlayerBuildings(playerId uint, mapId uint) ([]dto.PlayerBuilding, error)
 		Preload("Building.Category").
 		Preload("Building.Levels").
 		Preload("BuildingLevel").
+		Preload("BuildingCurrentProduction").
 		Find(&playerBuildingModels, "player_id = ? AND map_id = ?", playerId, mapId).
 		Error; err != nil {
 

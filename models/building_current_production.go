@@ -3,7 +3,7 @@ package models
 import "time"
 
 type BuildingCurrentProduction struct {
-	ID                   uint       `gorm:"primaryKey"`
+	ID                   int64      `gorm:"primaryKey"`
 	PlayerID             uint       `gorm:"not null"`
 	PlayerBuildingID     uint       `gorm:"not null"`
 	BuildingProductionID uint       `gorm:"not null"`

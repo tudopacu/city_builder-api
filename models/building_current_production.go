@@ -11,6 +11,8 @@ type BuildingCurrentProduction struct {
 	Status               string     `gorm:"type:ENUM('PENDING','DONE','COLLECTED');not null;default:'PENDING'"`
 	CreatedAt            time.Time  `gorm:"autoCreateTime"`
 	UpdatedAt            *time.Time `gorm:"autoUpdateTime"`
+
+	BuildingProduction BuildingProduction `gorm:"foreignKey:BuildingProductionID;references:ID;constraint:OnUpdate:CASCADE,OnDelete:CASCADE;"`
 }
 
 func (BuildingCurrentProduction) TableName() string {

@@ -28,27 +28,23 @@ func InitRouter() {
 	auth.GET("/maps", controllers.GetMaps)
 
 	game := r.Group("/game").Use(s.AuthMiddleware())
+
 	game.GET("/get_player", controllers.GetPlayer)
 	game.GET("/get_player_buildings/:player_id/:map_id", controllers.GetPlayerBuildings)
 	game.GET("/get_player_inventory/:player_id", controllers.GetPlayerInventory)
 	game.POST("/add_building", controllers.AddPlayerBuilding)
 	game.DELETE("/remove_player_building/:player_building_id", controllers.DeletePlayerBuilding)
 	game.POST("/add_inventory_item", controllers.AddInventoryItem)
-
 	game.POST("/start_production/:player_id/:player_building_id/:building_production_id", controllers.StartBuildingProduction)
 	game.PUT("/collect_production/:player_id/:player_building_id/:building_production_id", controllers.CollectBuildingProduction)
 
 	game.GET("/map/:id", controllers.GetMap)
-
 	game.GET("/tiles", controllers.GetTiles)
-
 	game.GET("/buildings", controllers.GetBuildings)
-
 	game.GET("/items", controllers.GetItems)
-
 	game.GET("/roads/:player_id/:map_id", controllers.GetRoads)
-
 	game.GET("/inventory/:player_id", controllers.GetPlayerInventory)
+	game.GET("/current_timestamp", controllers.GetCurrentTimestamp)
 
 	r.POST("/register", controllers.HandleRegister)
 	r.POST("/login", controllers.HandleLogin)

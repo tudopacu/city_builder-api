@@ -9,9 +9,24 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"time"
 )
 
 func GetPlayerBuildings(playerId uint, mapId uint) ([]dto.PlayerBuilding, error) {
+	playerBuildingIDs := database.DB.
+		Model(&models.PlayerBuilding{}).
+		Select("id").
+		Where("player_id = ? AND map_id = ?", playerId, mapId)
+
+	if err := database.DB.Model(&models.BuildingCurrentProduction{}).
+		Where("player_id = ? AND player_building_id IN (?) AND status = ? AND end_time <= ?",
+			playerId, playerBuildingIDs, "PENDING", time.Now()).
+		Update("status", "DONE").Error; err != nil {
+		log.Default().Printf("failed to update expired productions for player_id %d on map_id %d: %s",
+			playerId, mapId, err)
+		return []dto.PlayerBuilding{}, fmt.Errorf("failed to update expired productions")
+	}
+
 	var playerBuildingModels []models.PlayerBuilding
 
 	if err := database.DB.
@@ -19,7 +34,8 @@ func GetPlayerBuildings(playerId uint, mapId uint) ([]dto.PlayerBuilding, error)
 		Preload("Building.Category").
 		Preload("Building.Levels").
 		Preload("BuildingLevel").
-		Preload("BuildingCurrentProduction").
+		Preload("BuildingCurrentProduction", "status <> ?", "COLLECTED").
+		Preload("BuildingCurrentProduction.BuildingProduction.Item").
 		Find(&playerBuildingModels, "player_id = ? AND map_id = ?", playerId, mapId).
 		Error; err != nil {
 

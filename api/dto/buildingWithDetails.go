@@ -7,6 +7,7 @@ type BuildingCost struct {
 }
 
 type BuildingProductionItem struct {
+	BuildingProductionID  uint   `json:"building_production_id"`
 	ItemID                uint   `json:"item_id"`
 	ItemName              string `json:"item_name"`
 	Quantity              int    `json:"quantity"`

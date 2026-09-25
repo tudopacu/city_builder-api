@@ -56,6 +56,7 @@ func GetAllBuildings() ([]dto.BuildingWithDetails, error) {
 		var productions []dto.BuildingProductionItem
 		for _, prod := range building.Productions {
 			productions = append(productions, dto.BuildingProductionItem{
+				BuildingProductionID:  prod.ID,
 				ItemID:                prod.ItemID,
 				ItemName:              prod.Item.Name,
 				Quantity:              prod.Quantity,

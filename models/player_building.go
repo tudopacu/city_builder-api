@@ -16,10 +16,10 @@ type PlayerBuilding struct {
 	CreatedAt       time.Time `gorm:"autoCreateTime"`
 	UpdatedAt       *time.Time
 
-	Building      Building      `gorm:"foreignKey:BuildingID;references:ID;constraint:OnUpdate:CASCADE,OnDelete:CASCADE;"`
-	BuildingLevel BuildingLevel `gorm:"foreignKey:BuildingLevelID;references:ID;constraint:OnUpdate:CASCADE,OnDelete:CASCADE;"`
-	Map           Map           `gorm:"constraint:OnUpdate:CASCADE,OnDelete:CASCADE;"`
-	PlayerInventories []PlayerInventory `gorm:"foreignKey:PlayerBuildingID"`
+	Building                  Building                   `gorm:"foreignKey:BuildingID;references:ID;constraint:OnUpdate:CASCADE,OnDelete:CASCADE;"`
+	BuildingLevel             BuildingLevel              `gorm:"foreignKey:BuildingLevelID;references:ID;constraint:OnUpdate:CASCADE,OnDelete:CASCADE;"`
+	Map                       Map                        `gorm:"constraint:OnUpdate:CASCADE,OnDelete:CASCADE;"`
+	PlayerInventories         []PlayerInventory          `gorm:"foreignKey:PlayerBuildingID"`
 	BuildingCurrentProduction *BuildingCurrentProduction `gorm:"foreignKey:PlayerBuildingID"`
 }
 
@@ -43,6 +43,8 @@ func (b PlayerBuilding) ToDTO() dto.PlayerBuilding {
 			EndTime:              b.BuildingCurrentProduction.EndTime,
 			Status:               b.BuildingCurrentProduction.Status,
 			BuildingProductionID: b.BuildingCurrentProduction.BuildingProductionID,
+			ItemName:             b.BuildingCurrentProduction.BuildingProduction.Item.Name,
+			Quantity:             b.BuildingCurrentProduction.BuildingProduction.Quantity,
 		}
 		playerBuildingDTO.BuildingCurrentProduction = &currentProd
 	}

@@ -26,13 +26,13 @@ func StartBuildingProduction(c *gin.Context) {
 		return
 	}
 
-	statusCode, serviceErr := services.StartProduction(uint(playerID), uint(playerBuildingID), uint(buildingProductionID))
+	statusCode, response, serviceErr := services.StartProduction(uint(playerID), uint(playerBuildingID), uint(buildingProductionID))
 	if serviceErr != nil {
 		c.JSON(statusCode, gin.H{"error": serviceErr.Error()})
 		return
 	}
 
-	c.JSON(statusCode, gin.H{"message": "production started successfully"})
+	c.JSON(statusCode, response)
 }
 
 func CollectBuildingProduction(c *gin.Context) {

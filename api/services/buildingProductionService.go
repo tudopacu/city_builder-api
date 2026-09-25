@@ -1,6 +1,8 @@
 package services
 
 import (
+	"API/api/dto"
+	"API/api/dto/responses"
 	"API/database"
 	"API/models"
 	"fmt"
@@ -9,21 +11,21 @@ import (
 	"time"
 )
 
-func StartProduction(playerID, playerBuildingID, buildingProductionID uint) (int, error) {
+func StartProduction(playerID, playerBuildingID, buildingProductionID uint) (int, *responses.StartProductionResponse, error) {
 	var playerBuilding models.PlayerBuilding
 	if err := database.DB.First(&playerBuilding, playerBuildingID).Error; err != nil {
 		log.Default().Printf("player building not found, id %d: %s", playerBuildingID, err)
-		return http.StatusNotFound, fmt.Errorf("player building not found")
+		return http.StatusNotFound, nil, fmt.Errorf("player building not found")
 	}
 
 	var buildingProduction models.BuildingProduction
-	if err := database.DB.First(&buildingProduction, buildingProductionID).Error; err != nil {
+	if err := database.DB.Preload("Item").First(&buildingProduction, buildingProductionID).Error; err != nil {
 		log.Default().Printf("building production not found, id %d: %s", buildingProductionID, err)
-		return http.StatusNotFound, fmt.Errorf("building production not found")
+		return http.StatusNotFound, nil, fmt.Errorf("building production not found")
 	}
 
 	if buildingProduction.BuildingID != playerBuilding.BuildingID {
-		return http.StatusBadRequest, fmt.Errorf("building production does not belong to this building")
+		return http.StatusBadRequest, nil, fmt.Errorf("building production does not belong to this building")
 	}
 
 	var existing models.BuildingCurrentProduction
@@ -32,10 +34,11 @@ func StartProduction(playerID, playerBuildingID, buildingProductionID uint) (int
 		playerID, playerBuildingID, buildingProductionID,
 	).First(&existing).Error
 	if err == nil {
-		return http.StatusConflict, fmt.Errorf("production already in progress")
+		return http.StatusConflict, nil, fmt.Errorf("production already in progress")
 	}
 
-	endTime := time.Now().Add(time.Duration(buildingProduction.ProductionTimeSeconds) * time.Second)
+	currentTimestamp := time.Now()
+	endTime := currentTimestamp.Add(time.Duration(buildingProduction.ProductionTimeSeconds) * time.Second)
 
 	entry := models.BuildingCurrentProduction{
 		PlayerID:             playerID,
@@ -47,17 +50,27 @@ func StartProduction(playerID, playerBuildingID, buildingProductionID uint) (int
 
 	if err := database.DB.Create(&entry).Error; err != nil {
 		log.Default().Printf("failed to create building current production: %s", err)
-		return http.StatusInternalServerError, fmt.Errorf("failed to start production")
+		return http.StatusInternalServerError, nil, fmt.Errorf("failed to start production")
 	}
 
-	return http.StatusCreated, nil
+	return http.StatusCreated, &responses.StartProductionResponse{
+		BuildingCurrentProduction: &dto.BuildingCurrentProduction{
+			ID:                   entry.ID,
+			EndTime:              entry.EndTime,
+			Status:               entry.Status,
+			BuildingProductionID: entry.BuildingProductionID,
+			ItemName:             buildingProduction.Item.Name,
+			Quantity:             buildingProduction.Quantity,
+		},
+		CurrentTimestamp: currentTimestamp,
+	}, nil
 }
 
 func CollectProduction(playerID, playerBuildingID, buildingProductionID uint) (int, error) {
 	var entry models.BuildingCurrentProduction
 	err := database.DB.Where(
-		"player_id = ? AND player_building_id = ? AND building_production_id = ? AND status = ?",
-		playerID, playerBuildingID, buildingProductionID, "PENDING",
+		"player_id = ? AND player_building_id = ? AND building_production_id = ? AND status IN ('PENDING','DONE')",
+		playerID, playerBuildingID, buildingProductionID,
 	).First(&entry).Error
 
 	if err != nil {

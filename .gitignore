@@ -8,6 +8,8 @@
 *.so
 *.dylib
 API
+# Keep the source directory visible on case-insensitive filesystems.
+!/api/
 
 # Test binary, built with `go test -c`
 *.test

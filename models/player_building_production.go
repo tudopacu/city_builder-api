@@ -2,7 +2,7 @@ package models
 
 import "time"
 
-type BuildingCurrentProduction struct {
+type PlayerBuildingProduction struct {
 	ID                   int64      `gorm:"primaryKey"`
 	PlayerID             uint       `gorm:"not null"`
 	PlayerBuildingID     uint       `gorm:"not null"`
@@ -15,6 +15,6 @@ type BuildingCurrentProduction struct {
 	BuildingProduction BuildingProduction `gorm:"foreignKey:BuildingProductionID;references:ID;constraint:OnUpdate:CASCADE,OnDelete:CASCADE;"`
 }
 
-func (BuildingCurrentProduction) TableName() string {
-	return "building_current_productions"
+func (PlayerBuildingProduction) TableName() string {
+	return "player_building_productions"
 }

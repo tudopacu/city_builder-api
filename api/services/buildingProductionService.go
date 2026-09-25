@@ -28,7 +28,7 @@ func StartProduction(playerID, playerBuildingID, buildingProductionID uint) (int
 		return http.StatusBadRequest, nil, fmt.Errorf("building production does not belong to this building")
 	}
 
-	var existing models.BuildingCurrentProduction
+	var existing models.PlayerBuildingProduction
 	err := database.DB.Where(
 		"player_id = ? AND player_building_id = ? AND building_production_id = ? AND status IN ('PENDING','DONE')",
 		playerID, playerBuildingID, buildingProductionID,
@@ -40,7 +40,7 @@ func StartProduction(playerID, playerBuildingID, buildingProductionID uint) (int
 	currentTimestamp := time.Now()
 	endTime := currentTimestamp.Add(time.Duration(buildingProduction.ProductionTimeSeconds) * time.Second)
 
-	entry := models.BuildingCurrentProduction{
+	entry := models.PlayerBuildingProduction{
 		PlayerID:             playerID,
 		PlayerBuildingID:     playerBuildingID,
 		BuildingProductionID: buildingProductionID,
@@ -67,7 +67,7 @@ func StartProduction(playerID, playerBuildingID, buildingProductionID uint) (int
 }
 
 func CollectProduction(playerID, playerBuildingID, buildingProductionID uint) (int, error) {
-	var entry models.BuildingCurrentProduction
+	var entry models.PlayerBuildingProduction
 	err := database.DB.Where(
 		"player_id = ? AND player_building_id = ? AND building_production_id = ? AND status IN ('PENDING','DONE')",
 		playerID, playerBuildingID, buildingProductionID,
@@ -92,7 +92,7 @@ func CollectProduction(playerID, playerBuildingID, buildingProductionID uint) (i
 }
 
 func DeleteCollectedProductions() {
-	result := database.DB.Where("status = ?", "COLLECTED").Delete(&models.BuildingCurrentProduction{})
+	result := database.DB.Where("status = ?", "COLLECTED").Delete(&models.PlayerBuildingProduction{})
 	if result.Error != nil {
 		log.Default().Printf("failed to delete collected productions: %s", result.Error)
 		return

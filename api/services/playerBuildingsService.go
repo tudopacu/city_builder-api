@@ -18,7 +18,7 @@ func GetPlayerBuildings(playerId uint, mapId uint) ([]dto.PlayerBuilding, error)
 		Select("id").
 		Where("player_id = ? AND map_id = ?", playerId, mapId)
 
-	if err := database.DB.Model(&models.BuildingCurrentProduction{}).
+	if err := database.DB.Model(&models.PlayerBuildingProduction{}).
 		Where("player_id = ? AND player_building_id IN (?) AND status = ? AND end_time <= ?",
 			playerId, playerBuildingIDs, "PENDING", time.Now()).
 		Update("status", "DONE").Error; err != nil {

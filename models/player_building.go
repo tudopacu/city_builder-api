@@ -16,11 +16,11 @@ type PlayerBuilding struct {
 	CreatedAt       time.Time `gorm:"autoCreateTime"`
 	UpdatedAt       *time.Time
 
-	Building                  Building                   `gorm:"foreignKey:BuildingID;references:ID;constraint:OnUpdate:CASCADE,OnDelete:CASCADE;"`
-	BuildingLevel             BuildingLevel              `gorm:"foreignKey:BuildingLevelID;references:ID;constraint:OnUpdate:CASCADE,OnDelete:CASCADE;"`
-	Map                       Map                        `gorm:"constraint:OnUpdate:CASCADE,OnDelete:CASCADE;"`
-	PlayerInventories         []PlayerInventory          `gorm:"foreignKey:PlayerBuildingID"`
-	BuildingCurrentProduction *BuildingCurrentProduction `gorm:"foreignKey:PlayerBuildingID"`
+	Building                  Building                  `gorm:"foreignKey:BuildingID;references:ID;constraint:OnUpdate:CASCADE,OnDelete:CASCADE;"`
+	BuildingLevel             BuildingLevel             `gorm:"foreignKey:BuildingLevelID;references:ID;constraint:OnUpdate:CASCADE,OnDelete:CASCADE;"`
+	Map                       Map                       `gorm:"constraint:OnUpdate:CASCADE,OnDelete:CASCADE;"`
+	PlayerInventories         []PlayerInventory         `gorm:"foreignKey:PlayerBuildingID"`
+	BuildingCurrentProduction *PlayerBuildingProduction `gorm:"foreignKey:PlayerBuildingID"`
 }
 
 func (PlayerBuilding) TableName() string {

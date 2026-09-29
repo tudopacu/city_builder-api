@@ -8,6 +8,7 @@ import (
 type PlayerInventory struct {
 	ID               uint      `gorm:"primaryKey"`
 	PlayerID         uint      `gorm:"not null"`
+	MapID            uint      `gorm:"not null"`
 	PlayerBuildingID uint      `gorm:"not null"`
 	Capacity         int       `gorm:"not null"`
 	CreatedAt        time.Time `gorm:"autoCreateTime"`

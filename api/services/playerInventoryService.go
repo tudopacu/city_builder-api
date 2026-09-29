@@ -11,13 +11,13 @@ import (
 	"net/http"
 )
 
-func GetPlayerInventories(playerID uint) ([]dto.PlayerInventory, int, int, error) {
+func GetPlayerInventories(playerID, mapID uint) ([]dto.PlayerInventory, int, int, error) {
 	var inventories []models.PlayerInventory
 
 	if err := database.DB.
 		Preload("InventoryItems").
 		Preload("InventoryItems.Item").
-		Find(&inventories, "player_id = ?", playerID).
+		Find(&inventories, "player_id = ? AND map_id = ?", playerID, mapID).
 		Error; err != nil {
 
 		log.Default().Printf("failed to fetch player inventories for player_id %d: %s", playerID, err)

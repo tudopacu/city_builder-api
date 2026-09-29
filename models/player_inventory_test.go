@@ -83,11 +83,9 @@ func TestPlayerInventoryItemModel(t *testing.T) {
 
 func TestPlayerInventoryToDTO(t *testing.T) {
 	inventory := PlayerInventory{
-		ID:       1,
-		Capacity: 50,
-		PlayerBuilding: PlayerBuilding{
-			ID: 2,
-		},
+		ID:               1,
+		Capacity:         50,
+		PlayerBuildingID: 2,
 		InventoryItems: []PlayerInventoryItem{
 			{
 				ID:       10,
@@ -112,7 +110,7 @@ func TestPlayerInventoryToDTO(t *testing.T) {
 	}
 
 	if inventoryDTO.PlayerBuildingID != 2 {
-		t.Errorf("Expected PlayerBuilding.ID to be 2, got %d", inventoryDTO.PlayerBuildingID)
+		t.Errorf("Expected PlayerBuildingID to be 2, got %d", inventoryDTO.PlayerBuildingID)
 	}
 
 	if len(inventoryDTO.Items) != 1 {

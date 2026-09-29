@@ -6,10 +6,14 @@ import (
 	"API/api/dto/responses"
 	"API/database"
 	"API/models"
+	"errors"
 	"fmt"
 	"log"
 	"net/http"
 	"time"
+
+	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 func GetPlayerBuildings(playerId uint, mapId uint) ([]dto.PlayerBuilding, error) {
@@ -64,17 +68,21 @@ func validateCoordinates(x, y int) error {
 	return nil
 }
 
-func getBuildingWithLevel(buildingID uint) (*models.Building, *models.BuildingLevel, error) {
+func getBuildingWithLevel(tx *gorm.DB, buildingID uint) (*models.Building, *models.BuildingLevel, error) {
 	var building models.Building
-	if err := database.DB.First(&building, buildingID).Error; err != nil {
-		log.Default().Printf("building not found, building_id %d: %s", buildingID, err)
-		return nil, nil, fmt.Errorf("building not found")
+	if err := tx.First(&building, buildingID).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, nil, fmt.Errorf("building not found")
+		}
+		return nil, nil, fmt.Errorf("failed to load building: %w", err)
 	}
 
 	var buildingLevel models.BuildingLevel
-	if err := database.DB.Where("building_id = ? AND level = ?", buildingID, 1).First(&buildingLevel).Error; err != nil {
-		log.Default().Printf("building level 1 not found for building_id %d: %s", buildingID, err)
-		return nil, nil, fmt.Errorf("building level not found")
+	if err := tx.Where("building_id = ? AND level = ?", buildingID, 1).First(&buildingLevel).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, nil, fmt.Errorf("building level not found")
+		}
+		return nil, nil, fmt.Errorf("failed to load building level: %w", err)
 	}
 
 	return &building, &buildingLevel, nil
@@ -99,15 +107,15 @@ func buildCoordinatesList(startX, startY, width, length int) []struct {
 	return coordinates
 }
 
-func validateTerrainForBuilding(mapID uint, x, y, width, length int) error {
+func validateTerrainForBuilding(tx *gorm.DB, mapID uint, x, y, width, length int) error {
 	coordinates := buildCoordinatesList(x, y, width, length)
 
 	// Fetch all terrains in one query
 	var terrains []models.Terrain
-	query := database.DB.Preload("Tile").Where("map_id = ?", mapID)
+	query := tx.Preload("Tile").Where("map_id = ?", mapID)
 
 	// Build OR conditions for all coordinates
-	orConditions := database.DB.Where("1 = 0") // Start with false condition
+	orConditions := tx.Where("1 = 0") // Start with false condition
 	for _, coord := range coordinates {
 		orConditions = orConditions.Or("(x = ? AND y = ?)", coord.X, coord.Y)
 	}
@@ -134,9 +142,9 @@ func validateTerrainForBuilding(mapID uint, x, y, width, length int) error {
 	return nil
 }
 
-func checkBuildingOverlap(mapID uint, x, y, width, length int) error {
+func checkBuildingOverlap(tx *gorm.DB, mapID uint, x, y, width, length int) error {
 	var existingBuildings []models.PlayerBuilding
-	if err := database.DB.Preload("Building").Where("map_id = ?", mapID).Find(&existingBuildings).Error; err != nil {
+	if err := tx.Preload("Building").Where("map_id = ?", mapID).Find(&existingBuildings).Error; err != nil {
 		log.Default().Printf("failed to fetch existing buildings on map_id %d: %s", mapID, err)
 		return fmt.Errorf("failed to validate building placement")
 	}
@@ -161,7 +169,7 @@ func checkBuildingOverlap(mapID uint, x, y, width, length int) error {
 	return nil
 }
 
-func createPlayerBuilding(request requests.AddBuildingRequest, buildingLevelID uint) (*models.PlayerBuilding, error) {
+func createPlayerBuilding(tx *gorm.DB, request requests.AddBuildingRequest, buildingLevelID uint) (*models.PlayerBuilding, error) {
 	playerBuilding := models.PlayerBuilding{
 		PlayerID:        request.PlayerID,
 		BuildingID:      request.BuildingID,
@@ -171,7 +179,7 @@ func createPlayerBuilding(request requests.AddBuildingRequest, buildingLevelID u
 		Y:               request.Y,
 	}
 
-	if err := database.DB.Create(&playerBuilding).Error; err != nil {
+	if err := tx.Create(&playerBuilding).Error; err != nil {
 		log.Default().Printf("failed to create player building for player_id %d: %s", request.PlayerID, err)
 		return nil, fmt.Errorf("failed to place building")
 	}
@@ -179,8 +187,8 @@ func createPlayerBuilding(request requests.AddBuildingRequest, buildingLevelID u
 	return &playerBuilding, nil
 }
 
-func loadPlayerBuildingWithAssociations(playerBuilding *models.PlayerBuilding) error {
-	if err := database.DB.Preload("Building").Preload("Building.Category").Preload("BuildingLevel").First(playerBuilding, playerBuilding.ID).Error; err != nil {
+func loadPlayerBuildingWithAssociations(tx *gorm.DB, playerBuilding *models.PlayerBuilding) error {
+	if err := tx.Preload("Building").Preload("Building.Category").Preload("BuildingLevel").First(playerBuilding, playerBuilding.ID).Error; err != nil {
 		log.Default().Printf("failed to load created building with ID %d: %s", playerBuilding.ID, err)
 		return fmt.Errorf("failed to load building details")
 	}
@@ -208,42 +216,117 @@ func AddPlayerBuilding(request requests.AddBuildingRequest) (int, responses.AddP
 		return http.StatusBadRequest, responses.AddPlayerBuildingResponse{Error: err.Error()}
 	}
 
-	// Get building and its level 1
-	building, buildingLevel, err := getBuildingWithLevel(request.BuildingID)
+	statusCode := http.StatusInternalServerError
+	var playerBuilding *models.PlayerBuilding
+	err := database.DB.Transaction(func(tx *gorm.DB) error {
+		building, buildingLevel, err := getBuildingWithLevel(tx, request.BuildingID)
+		if err != nil {
+			if err.Error() == "building not found" || err.Error() == "building level not found" {
+				statusCode = http.StatusNotFound
+			}
+			return err
+		}
+
+		if err := validateTerrainForBuilding(tx, request.MapID, request.X, request.Y, building.Width, building.Length); err != nil {
+			if err.Error() != "failed to validate terrain" {
+				statusCode = http.StatusBadRequest
+			}
+			return err
+		}
+
+		if err := checkBuildingOverlap(tx, request.MapID, request.X, request.Y, building.Width, building.Length); err != nil {
+			if err.Error() != "failed to validate building placement" {
+				statusCode = http.StatusBadRequest
+			}
+			return err
+		}
+
+		if costStatus, err := consumeBuildingConstructionCosts(tx, request.PlayerID, request.BuildingID); err != nil {
+			statusCode = costStatus
+			return err
+		}
+
+		playerBuilding, err = createPlayerBuilding(tx, request, buildingLevel.ID)
+		if err != nil {
+			return err
+		}
+		return loadPlayerBuildingWithAssociations(tx, playerBuilding)
+	})
 	if err != nil {
-		if err.Error() == "building not found" {
-			return http.StatusNotFound, responses.AddPlayerBuildingResponse{Error: err.Error()}
+		if statusCode == http.StatusInternalServerError {
+			log.Default().Printf("failed to add building_id %d for player_id %d: %s", request.BuildingID, request.PlayerID, err)
+			return statusCode, responses.AddPlayerBuildingResponse{Error: "failed to place building"}
 		}
-		return http.StatusNotFound, responses.AddPlayerBuildingResponse{Error: err.Error()}
-	}
-
-	// Validate terrain tiles are grass or dirt
-	if err := validateTerrainForBuilding(request.MapID, request.X, request.Y, building.Width, building.Length); err != nil {
-		if err.Error() == "failed to validate terrain" {
-			return http.StatusInternalServerError, responses.AddPlayerBuildingResponse{Error: err.Error()}
-		}
-		return http.StatusBadRequest, responses.AddPlayerBuildingResponse{Error: err.Error()}
-	}
-
-	// Check for overlap with existing buildings
-	if err := checkBuildingOverlap(request.MapID, request.X, request.Y, building.Width, building.Length); err != nil {
-		if err.Error() == "failed to validate building placement" {
-			return http.StatusInternalServerError, responses.AddPlayerBuildingResponse{Error: err.Error()}
-		}
-		return http.StatusBadRequest, responses.AddPlayerBuildingResponse{Error: err.Error()}
-	}
-
-	// Create the player building
-	playerBuilding, err := createPlayerBuilding(request, buildingLevel.ID)
-	if err != nil {
-		return http.StatusInternalServerError, responses.AddPlayerBuildingResponse{Error: err.Error()}
-	}
-
-	// Load the created building with its associations for the response
-	if err := loadPlayerBuildingWithAssociations(playerBuilding); err != nil {
-		return http.StatusInternalServerError, responses.AddPlayerBuildingResponse{Error: err.Error()}
+		return statusCode, responses.AddPlayerBuildingResponse{Error: err.Error()}
 	}
 
 	playerBuildingDTO := playerBuilding.ToDTO()
 	return http.StatusCreated, responses.AddPlayerBuildingResponse{PlayerBuilding: &playerBuildingDTO}
+}
+
+func consumeBuildingConstructionCosts(tx *gorm.DB, playerID, buildingID uint) (int, error) {
+	var costs []models.BuildingConstructionCost
+	if err := tx.Where("building_id = ?", buildingID).Order("item_id ASC").Order("id ASC").Find(&costs).Error; err != nil {
+		return http.StatusInternalServerError, fmt.Errorf("failed to load construction costs: %w", err)
+	}
+
+	required := make(map[uint]int)
+	var itemIDs []uint
+	for _, cost := range costs {
+		if cost.Quantity < 1 {
+			return http.StatusInternalServerError, fmt.Errorf("invalid construction cost for item %d", cost.ItemID)
+		}
+		if _, exists := required[cost.ItemID]; !exists {
+			itemIDs = append(itemIDs, cost.ItemID)
+		}
+		required[cost.ItemID] += cost.Quantity
+	}
+	if len(required) == 0 {
+		return http.StatusOK, nil
+	}
+
+	// Use the same lock order as production collection, including locking reads
+	// of item quantities so concurrent construction cannot spend the same stock.
+	var inventories []models.PlayerInventory
+	if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
+		Preload("InventoryItems", func(db *gorm.DB) *gorm.DB {
+			return db.Clauses(clause.Locking{Strength: "UPDATE"}).Order("id ASC")
+		}).
+		Where("player_id = ?", playerID).
+		Order("id ASC").Find(&inventories).Error; err != nil {
+		return http.StatusInternalServerError, fmt.Errorf("failed to load player inventories: %w", err)
+	}
+
+	available := make(map[uint]int)
+	for _, inventory := range inventories {
+		for _, item := range inventory.InventoryItems {
+			available[item.ItemID] += max(0, item.Quantity)
+		}
+	}
+	// Check every cost before modifying any inventory.
+	for _, itemID := range itemIDs {
+		if available[itemID] < required[itemID] {
+			return http.StatusBadRequest, fmt.Errorf("not enough items for construction: item %d, required %d, available %d",
+				itemID, required[itemID], available[itemID])
+		}
+	}
+
+	for _, inventory := range inventories {
+		for _, item := range inventory.InventoryItems {
+			quantity := min(required[item.ItemID], item.Quantity)
+			if quantity <= 0 {
+				continue
+			}
+			result := tx.Model(&item).Where("quantity >= ?", quantity).
+				Update("quantity", gorm.Expr("quantity - ?", quantity))
+			if result.Error != nil {
+				return http.StatusInternalServerError, fmt.Errorf("failed to consume construction item: %w", result.Error)
+			}
+			if result.RowsAffected != 1 {
+				return http.StatusInternalServerError, fmt.Errorf("construction item %d changed during placement", item.ID)
+			}
+			required[item.ItemID] -= quantity
+		}
+	}
+	return http.StatusOK, nil
 }

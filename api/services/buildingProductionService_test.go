@@ -48,7 +48,7 @@ func newCollectionTestDB(t *testing.T) *gorm.DB {
 			building_production_id INTEGER, end_time DATETIME, status TEXT,
 			created_at DATETIME, updated_at DATETIME)`,
 		`CREATE TABLE player_inventories (
-			id INTEGER PRIMARY KEY, player_id INTEGER, player_building_id INTEGER,
+			id INTEGER PRIMARY KEY, player_id INTEGER, map_id INTEGER, player_building_id INTEGER,
 			capacity INTEGER, created_at DATETIME, updated_at DATETIME)`,
 		`CREATE TABLE player_inventory_items (
 			id INTEGER PRIMARY KEY, player_inventory_id INTEGER, item_id INTEGER,

@@ -17,7 +17,7 @@ func InitRouter() {
 
 	r.Use(cors.New(cors.Config{
 		AllowOrigins:     []string{os.Getenv("GAME_URL"), os.Getenv("SITE_URL")},
-		AllowMethods:     []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"}, //todo restrict these
+		AllowMethods:     []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
 		AllowHeaders:     []string{"Origin", "Content-Type", "Authorization"},
 		ExposeHeaders:    []string{"Content-Length"},
 		AllowCredentials: true,
@@ -31,7 +31,7 @@ func InitRouter() {
 
 	game.GET("/get_player", controllers.GetPlayer)
 	game.GET("/get_player_buildings/:player_id/:map_id", controllers.GetPlayerBuildings)
-	game.GET("/get_player_inventory/:player_id", controllers.GetPlayerInventory)
+	game.GET("/get_player_inventories/:player_id/:map_id", controllers.GetPlayerInventories)
 	game.POST("/add_building", controllers.AddPlayerBuilding)
 	game.DELETE("/remove_player_building/:player_building_id", controllers.DeletePlayerBuilding)
 	game.POST("/add_inventory_item", controllers.AddInventoryItem)
@@ -43,7 +43,6 @@ func InitRouter() {
 	game.GET("/buildings", controllers.GetBuildings)
 	game.GET("/items", controllers.GetItems)
 	game.GET("/roads/:player_id/:map_id", controllers.GetRoads)
-	game.GET("/inventory/:player_id", controllers.GetPlayerInventory)
 	game.GET("/current_timestamp", controllers.GetCurrentTimestamp)
 
 	r.POST("/register", controllers.HandleRegister)

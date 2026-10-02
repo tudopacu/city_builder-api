@@ -7,6 +7,7 @@ type BuildingLevel struct {
 	BuildingID       uint `gorm:"not null"`
 	Level            uint `gorm:"not null"`
 	BuildTimeSeconds uint `gorm:"not null"`
+	Capacity         int  `gorm:"not null;default:0"`
 	ImageURL         *string
 	CreatedAt        time.Time `gorm:"autoCreateTime"`
 	UpdatedAt        *time.Time

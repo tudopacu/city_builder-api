@@ -48,7 +48,7 @@ func newBuildingTestDB(t *testing.T) *gorm.DB {
 	execBuildingTestSQL(t, db,
 		`CREATE TABLE buildings (id INTEGER PRIMARY KEY, name TEXT, width INTEGER, length INTEGER, building_category_id INTEGER)`,
 		`CREATE TABLE building_categories (id INTEGER PRIMARY KEY, name TEXT)`,
-		`CREATE TABLE building_levels (id INTEGER PRIMARY KEY, building_id INTEGER, level INTEGER)`,
+		`CREATE TABLE building_levels (id INTEGER PRIMARY KEY, building_id INTEGER, level INTEGER, capacity INTEGER DEFAULT 0)`,
 		`CREATE TABLE building_construction_costs (id INTEGER PRIMARY KEY, building_id INTEGER, item_id INTEGER, quantity INTEGER)`,
 		`CREATE TABLE player_buildings (id INTEGER PRIMARY KEY, player_id INTEGER, building_id INTEGER, map_id INTEGER,
 			building_level_id INTEGER, x INTEGER, y INTEGER, created_at DATETIME, updated_at DATETIME)`,

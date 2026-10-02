@@ -70,7 +70,7 @@ func validateCoordinates(x, y int) error {
 
 func getBuildingWithLevel(tx *gorm.DB, buildingID uint) (*models.Building, *models.BuildingLevel, error) {
 	var building models.Building
-	if err := tx.First(&building, buildingID).Error; err != nil {
+	if err := tx.Preload("Category").First(&building, buildingID).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, nil, fmt.Errorf("building not found")
 		}
@@ -196,13 +196,33 @@ func loadPlayerBuildingWithAssociations(tx *gorm.DB, playerBuilding *models.Play
 }
 
 func DeletePlayerBuilding(playerBuildingID uint) (int, error) {
-	var playerBuilding models.PlayerBuilding
-	if err := database.DB.First(&playerBuilding, playerBuildingID).Error; err != nil {
-		log.Default().Printf("player building not found, id %d: %s", playerBuildingID, err)
-		return http.StatusNotFound, fmt.Errorf("player building not found")
-	}
+	err := database.DB.Transaction(func(tx *gorm.DB) error {
+		var playerBuilding models.PlayerBuilding
+		if err := tx.Preload("Building.Category").First(&playerBuilding, playerBuildingID).Error; err != nil {
+			return err
+		}
 
-	if err := database.DB.Delete(&playerBuilding).Error; err != nil {
+		if playerBuilding.Building.Category.Name == "Storage" {
+			var inventories []models.PlayerInventory
+			if err := tx.Where("player_building_id = ?", playerBuilding.ID).Find(&inventories).Error; err != nil {
+				return fmt.Errorf("failed to load storage inventories: %w", err)
+			}
+			for _, inventory := range inventories {
+				if err := tx.Where("player_inventory_id = ?", inventory.ID).Delete(&models.PlayerInventoryItem{}).Error; err != nil {
+					return fmt.Errorf("failed to delete storage inventory items: %w", err)
+				}
+			}
+			if err := tx.Where("player_building_id = ?", playerBuilding.ID).Delete(&models.PlayerInventory{}).Error; err != nil {
+				return fmt.Errorf("failed to delete storage inventories: %w", err)
+			}
+		}
+		return tx.Delete(&playerBuilding).Error
+	})
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			log.Default().Printf("player building not found, id %d: %s", playerBuildingID, err)
+			return http.StatusNotFound, fmt.Errorf("player building not found")
+		}
 		log.Default().Printf("failed to delete player building id %d: %s", playerBuildingID, err)
 		return http.StatusInternalServerError, fmt.Errorf("failed to delete player building")
 	}
@@ -249,6 +269,17 @@ func AddPlayerBuilding(request requests.AddBuildingRequest) (int, responses.AddP
 		playerBuilding, err = createPlayerBuilding(tx, request, buildingLevel.ID)
 		if err != nil {
 			return err
+		}
+		if building.Category.Name == "Storage" {
+			inventory := models.PlayerInventory{
+				PlayerID:         request.PlayerID,
+				MapID:            request.MapID,
+				PlayerBuildingID: playerBuilding.ID,
+				Capacity:         buildingLevel.Capacity,
+			}
+			if err := tx.Create(&inventory).Error; err != nil {
+				return fmt.Errorf("failed to create storage inventory: %w", err)
+			}
 		}
 		return loadPlayerBuildingWithAssociations(tx, playerBuilding)
 	})

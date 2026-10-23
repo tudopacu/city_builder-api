@@ -29,12 +29,12 @@ func GetAllItems() ([]dto.Item, error) {
 	}
 
 	var items []models.Item
-	if err := database.DB.Find(&items).Error; err != nil {
+	if err := database.DB.Order("id ASC").Find(&items).Error; err != nil {
 		log.Default().Println("failed to fetch items", err)
 		return nil, fmt.Errorf("failed to fetch items")
 	}
 
-	var itemDTOs []dto.Item
+	itemDTOs := make([]dto.Item, 0, len(items))
 	for _, item := range items {
 		itemDTOs = append(itemDTOs, item.ToDTO())
 	}

@@ -35,6 +35,7 @@ func GetAllBuildings() ([]dto.BuildingWithDetails, error) {
 		Preload("Category").
 		Preload("ConstructionCosts.Item").
 		Preload("Productions.Item").
+		Preload("Levels").
 		Find(&buildings).Error; err != nil {
 		log.Default().Println("failed to fetch buildings", err)
 		return nil, fmt.Errorf("failed to fetch buildings")
@@ -64,16 +65,29 @@ func GetAllBuildings() ([]dto.BuildingWithDetails, error) {
 			})
 		}
 
+		// New buildings are always placed at level 1, so its population values
+		// are what the player pays or gains when building.
+		populationCapacity, populationCost := 0, 0
+		for _, level := range building.Levels {
+			if level.Level == 1 {
+				populationCapacity = level.PopulationCapacity
+				populationCost = level.PopulationCost
+				break
+			}
+		}
+
 		buildingsWithDetails = append(buildingsWithDetails, dto.BuildingWithDetails{
-			ID:               building.ID,
-			Name:             building.Name,
-			ImageURL:         building.ImageURL,
-			Description:      building.Description,
-			Width:            building.Width,
-			Length:           building.Length,
-			BuildingCategory: building.Category.Name,
-			Costs:            costs,
-			Productions:      productions,
+			ID:                 building.ID,
+			Name:               building.Name,
+			ImageURL:           building.ImageURL,
+			Description:        building.Description,
+			Width:              building.Width,
+			Length:             building.Length,
+			BuildingCategory:   building.Category.Name,
+			PopulationCapacity: populationCapacity,
+			PopulationCost:     populationCost,
+			Costs:              costs,
+			Productions:        productions,
 		})
 	}
 

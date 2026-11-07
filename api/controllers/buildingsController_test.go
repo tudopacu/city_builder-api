@@ -13,6 +13,9 @@ func TestGetBuildingsReturnsCategoryCostsAndProductions(t *testing.T) {
 			id INTEGER PRIMARY KEY, name TEXT, image_url TEXT, description TEXT,
 			width INTEGER, length INTEGER, building_category_id INTEGER)`,
 		`CREATE TABLE building_categories (id INTEGER PRIMARY KEY, name TEXT)`,
+		`CREATE TABLE building_levels (
+			id INTEGER PRIMARY KEY, building_id INTEGER, level INTEGER,
+			population_capacity INTEGER DEFAULT 0, population_cost INTEGER DEFAULT 0)`,
 		`CREATE TABLE items (id INTEGER PRIMARY KEY, name TEXT)`,
 		`CREATE TABLE building_construction_costs (
 			id INTEGER PRIMARY KEY, building_id INTEGER, item_id INTEGER, quantity INTEGER)`,
@@ -22,6 +25,8 @@ func TestGetBuildingsReturnsCategoryCostsAndProductions(t *testing.T) {
 		`INSERT INTO building_categories (id, name) VALUES (2, 'Production')`,
 		`INSERT INTO buildings (id, name, image_url, description, width, length, building_category_id)
 			VALUES (5, 'Sawmill', '/images/sawmill.png', 'Cuts timber', 3, 4, 2)`,
+		`INSERT INTO building_levels (id, building_id, level, population_capacity, population_cost)
+			VALUES (21, 5, 1, 0, 3)`,
 		`INSERT INTO items (id, name) VALUES (7, 'Stone'), (8, 'Wood')`,
 		`INSERT INTO building_construction_costs (id, building_id, item_id, quantity)
 			VALUES (11, 5, 7, 20)`,
@@ -33,6 +38,7 @@ func TestGetBuildingsReturnsCategoryCostsAndProductions(t *testing.T) {
 	assertControllerJSON(t, response, http.StatusOK, `{"buildings":[{
 		"id":5,"name":"Sawmill","image_url":"/images/sawmill.png","description":"Cuts timber",
 		"width":3,"length":4,"building_category":"Production",
+		"population_capacity":0,"population_cost":3,
 		"costs":[{"item_id":7,"item_name":"Stone","quantity":20}],
 		"productions":[{"building_production_id":12,"item_id":8,"item_name":"Wood","quantity":6,"production_time_seconds":120}]
 	}]}`)

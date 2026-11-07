@@ -15,13 +15,15 @@ type BuildingProductionItem struct {
 }
 
 type BuildingWithDetails struct {
-	ID               uint                     `json:"id"`
-	Name             string                   `json:"name"`
-	ImageURL         *string                  `json:"image_url,omitempty"`
-	Description      string                   `json:"description"`
-	Width            int                      `json:"width"`
-	Length           int                      `json:"length"`
-	BuildingCategory string                   `json:"building_category"`
-	Costs            []BuildingCost           `json:"costs"`
-	Productions      []BuildingProductionItem `json:"productions"`
+	ID                 uint                     `json:"id"`
+	Name               string                   `json:"name"`
+	ImageURL           *string                  `json:"image_url,omitempty"`
+	Description        string                   `json:"description"`
+	Width              int                      `json:"width"`
+	Length             int                      `json:"length"`
+	BuildingCategory   string                   `json:"building_category"`
+	PopulationCapacity int                      `json:"population_capacity"`
+	PopulationCost     int                      `json:"population_cost"`
+	Costs              []BuildingCost           `json:"costs"`
+	Productions        []BuildingProductionItem `json:"productions"`
 }

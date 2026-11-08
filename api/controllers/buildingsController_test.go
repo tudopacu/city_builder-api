@@ -71,9 +71,11 @@ func TestGetBuildingsReturnsCachedCatalog(t *testing.T) {
 	newControllerTestDB(t)
 
 	response := performControllerRequest(http.MethodGet, "/game/buildings", "/game/buildings", "", GetBuildings)
+	// The cached payload predates the population fields, so they come back as zero.
 	assertControllerJSON(t, response, http.StatusOK, `{"buildings":[{
 		"id":9,"name":"Warehouse","description":"Stores goods","width":2,"length":3,
-		"building_category":"Storage","costs":[],"productions":[]
+		"building_category":"Storage","population_capacity":0,"population_cost":0,
+		"costs":[],"productions":[]
 	}]}`)
 }
 

@@ -202,6 +202,12 @@ func DeletePlayerBuilding(playerBuildingID uint) (int, error) {
 			return err
 		}
 
+		// Take the player lock before any population read, like AddPlayerBuilding does,
+		// so changes to one player's buildings never run at the same time.
+		if err := lockPlayerForPopulation(tx, playerBuilding.PlayerID); err != nil {
+			return err
+		}
+
 		// Removing a non-housing building releases its population automatically.
 		// Removing housing is only allowed while the remaining housing still covers
 		// the population that is in use.
@@ -256,6 +262,13 @@ func AddPlayerBuilding(request requests.AddBuildingRequest) (int, responses.AddP
 	statusCode := http.StatusInternalServerError
 	var playerBuilding *models.PlayerBuilding
 	err := database.DB.Transaction(func(tx *gorm.DB) error {
+		// Serialize building changes per player before reading anything. This keeps
+		// the overlap and population checks below from racing with another request,
+		// and keeps the lock order the same as in DeletePlayerBuilding.
+		if err := lockPlayerForPopulation(tx, request.PlayerID); err != nil {
+			return err
+		}
+
 		building, buildingLevel, err := getBuildingWithLevel(tx, request.BuildingID)
 		if err != nil {
 			if err.Error() == "building not found" || err.Error() == "building level not found" {

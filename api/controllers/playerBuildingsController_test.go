@@ -249,6 +249,60 @@ func TestDeletePlayerBuildingDeletesStorageAndContents(t *testing.T) {
 	}
 }
 
+func TestGetPlayerPopulationReturnsTotalsForPlayerAndMap(t *testing.T) {
+	db := newBuildingControllersDB(t)
+	execControllerSQL(t, db,
+		`INSERT INTO building_levels (id, building_id, level, population_capacity, population_cost) VALUES
+			(41, 40, 1, 10, 0), (42, 30, 2, 0, 3)`,
+		// Only player 1 on map 9 counts: one house and one sawmill. The sawmill on map 8
+		// and the house of player 2 belong elsewhere.
+		`INSERT INTO player_buildings (id, player_id, building_id, map_id, building_level_id, x, y) VALUES
+			(10, 1, 40, 9, 41, 2, 3), (20, 1, 30, 9, 42, 4, 5), (30, 1, 30, 8, 42, 6, 7), (40, 2, 40, 9, 41, 8, 9)`,
+	)
+
+	response := performControllerRequest(http.MethodGet, "/game/get_player_population/:player_id/:map_id",
+		"/game/get_player_population/1/9", "", GetPlayerPopulation)
+
+	assertControllerJSON(t, response, http.StatusOK, `{"population":{"total":10,"used":3,"available":7}}`)
+}
+
+func TestGetPlayerPopulationRejectsInvalidIDs(t *testing.T) {
+	for _, tc := range []struct{ name, target, message string }{
+		{"player", "/game/get_player_population/abc/9", "invalid player_id"},
+		{"map", "/game/get_player_population/1/abc", "invalid map_id"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			response := performControllerRequest(http.MethodGet, "/game/get_player_population/:player_id/:map_id",
+				tc.target, "", GetPlayerPopulation)
+			assertControllerError(t, response, http.StatusBadRequest, tc.message)
+		})
+	}
+}
+
+func TestDeletePlayerBuildingRejectsHousingStillInUse(t *testing.T) {
+	db := newBuildingControllersDB(t)
+	execControllerSQL(t, db,
+		`INSERT INTO buildings (id, name, width, length, building_category_id) VALUES (40, 'House', 1, 1, 1)`,
+		`INSERT INTO building_levels (id, building_id, level, population_capacity, population_cost) VALUES (41, 40, 1, 2, 0)`,
+		`UPDATE building_levels SET population_cost = 3 WHERE id = 31`,
+		`INSERT INTO player_buildings (id, player_id, building_id, map_id, building_level_id, x, y) VALUES
+			(10, 1, 40, 9, 41, 2, 3), (20, 1, 30, 9, 31, 4, 5)`,
+	)
+
+	response := performControllerRequest(http.MethodDelete, "/game/remove_player_building/:player_building_id",
+		"/game/remove_player_building/10", "", DeletePlayerBuilding)
+
+	assertControllerError(t, response, http.StatusConflict,
+		"cannot remove housing: 3 population is in use but only 0 would remain")
+	var remaining int64
+	if err := db.Model(&models.PlayerBuilding{}).Count(&remaining).Error; err != nil {
+		t.Fatal(err)
+	}
+	if remaining != 2 {
+		t.Fatalf("player buildings = %d, want 2 after a refused removal", remaining)
+	}
+}
+
 func TestDeletePlayerBuildingRejectsInvalidID(t *testing.T) {
 	for _, id := range []string{"abc", "-1", "1.5", "4294967296"} {
 		t.Run(id, func(t *testing.T) {

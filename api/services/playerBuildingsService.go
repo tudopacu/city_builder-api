@@ -198,7 +198,26 @@ func loadPlayerBuildingWithAssociations(tx *gorm.DB, playerBuilding *models.Play
 func DeletePlayerBuilding(playerBuildingID uint) (int, error) {
 	err := database.DB.Transaction(func(tx *gorm.DB) error {
 		var playerBuilding models.PlayerBuilding
-		if err := tx.Preload("Building.Category").First(&playerBuilding, playerBuildingID).Error; err != nil {
+		if err := tx.Preload("Building.Category").Preload("BuildingLevel").First(&playerBuilding, playerBuildingID).Error; err != nil {
+			return err
+		}
+
+		// Take the player lock before any population read, like AddPlayerBuilding does,
+		// so changes to one player's buildings never run at the same time.
+		if err := lockPlayerForPopulation(tx, playerBuilding.PlayerID); err != nil {
+			return err
+		}
+
+		// Removing a non-housing building releases its population automatically.
+		// Removing housing is only allowed while the remaining housing still covers
+		// the population that is in use.
+		if err := ensureRemovalKeepsPopulationValid(
+			tx,
+			playerBuilding.PlayerID,
+			playerBuilding.MapID,
+			playerBuilding.BuildingLevel.PopulationCapacity,
+			playerBuilding.BuildingLevel.PopulationCost,
+		); err != nil {
 			return err
 		}
 
@@ -223,6 +242,10 @@ func DeletePlayerBuilding(playerBuildingID uint) (int, error) {
 			log.Default().Printf("player building not found, id %d: %s", playerBuildingID, err)
 			return http.StatusNotFound, fmt.Errorf("player building not found")
 		}
+		var populationConflict populationConflictError
+		if errors.As(err, &populationConflict) {
+			return http.StatusConflict, populationConflict
+		}
 		log.Default().Printf("failed to delete player building id %d: %s", playerBuildingID, err)
 		return http.StatusInternalServerError, fmt.Errorf("failed to delete player building")
 	}
@@ -239,6 +262,13 @@ func AddPlayerBuilding(request requests.AddBuildingRequest) (int, responses.AddP
 	statusCode := http.StatusInternalServerError
 	var playerBuilding *models.PlayerBuilding
 	err := database.DB.Transaction(func(tx *gorm.DB) error {
+		// Serialize building changes per player before reading anything. This keeps
+		// the overlap and population checks below from racing with another request,
+		// and keeps the lock order the same as in DeletePlayerBuilding.
+		if err := lockPlayerForPopulation(tx, request.PlayerID); err != nil {
+			return err
+		}
+
 		building, buildingLevel, err := getBuildingWithLevel(tx, request.BuildingID)
 		if err != nil {
 			if err.Error() == "building not found" || err.Error() == "building level not found" {
@@ -258,6 +288,15 @@ func AddPlayerBuilding(request requests.AddBuildingRequest) (int, responses.AddP
 			if err.Error() != "failed to validate building placement" {
 				statusCode = http.StatusBadRequest
 			}
+			return err
+		}
+
+		// Housing costs no population, every other building needs free population
+		// for as long as it exists.
+		if populationStatus, err := ensurePopulationAvailable(
+			tx, request.PlayerID, request.MapID, buildingLevel.PopulationCost,
+		); err != nil {
+			statusCode = populationStatus
 			return err
 		}
 

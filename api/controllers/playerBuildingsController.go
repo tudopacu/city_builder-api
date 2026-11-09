@@ -31,6 +31,28 @@ func GetPlayerBuildings(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"player_buildings": playerBuildingDTOs})
 }
 
+func GetPlayerPopulation(c *gin.Context) {
+	playerId, err := strconv.ParseUint(c.Param("player_id"), 10, 32)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid player_id"})
+		return
+	}
+
+	mapId, err := strconv.ParseUint(c.Param("map_id"), 10, 32)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid map_id"})
+		return
+	}
+
+	population, err := services.GetPlayerPopulation(uint(playerId), uint(mapId))
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"population": population})
+}
+
 func DeletePlayerBuilding(c *gin.Context) {
 	playerBuildingID, err := strconv.ParseUint(c.Param("player_building_id"), 10, 32)
 	if err != nil {

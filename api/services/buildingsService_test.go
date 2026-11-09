@@ -18,6 +18,9 @@ func seedBuildingsServiceCatalog(t *testing.T) (*gorm.DB, []dto.BuildingWithDeta
 			id INTEGER PRIMARY KEY, name TEXT, image_url TEXT, description TEXT,
 			width INTEGER, length INTEGER, building_category_id INTEGER)`,
 		`CREATE TABLE building_categories (id INTEGER PRIMARY KEY, name TEXT)`,
+		`CREATE TABLE building_levels (
+			id INTEGER PRIMARY KEY, building_id INTEGER, level INTEGER,
+			population_capacity INTEGER DEFAULT 0, population_cost INTEGER DEFAULT 0)`,
 		`CREATE TABLE items (id INTEGER PRIMARY KEY, name TEXT)`,
 		`CREATE TABLE building_construction_costs (
 			id INTEGER PRIMARY KEY, building_id INTEGER, item_id INTEGER, quantity INTEGER)`,
@@ -28,6 +31,10 @@ func seedBuildingsServiceCatalog(t *testing.T) (*gorm.DB, []dto.BuildingWithDeta
 		`INSERT INTO buildings (id, name, image_url, description, width, length, building_category_id) VALUES
 			(5, 'Sawmill', '/images/sawmill.png', 'Cuts timber', 3, 4, 2),
 			(6, 'Warehouse', NULL, 'Stores goods', 2, 3, 3)`,
+		// Only level 1 counts for new buildings, so the level 2 values must be ignored.
+		// The warehouse has no levels and must report zero population.
+		`INSERT INTO building_levels (id, building_id, level, population_capacity, population_cost) VALUES
+			(21, 5, 1, 0, 3), (22, 5, 2, 0, 9)`,
 		`INSERT INTO items (id, name) VALUES (7, 'Stone'), (8, 'Wood')`,
 		`INSERT INTO building_construction_costs (id, building_id, item_id, quantity) VALUES
 			(11, 5, 7, 20), (12, 6, 8, 10)`,
@@ -38,8 +45,8 @@ func seedBuildingsServiceCatalog(t *testing.T) (*gorm.DB, []dto.BuildingWithDeta
 	want := []dto.BuildingWithDetails{
 		{
 			ID: 5, Name: "Sawmill", ImageURL: &imageURL, Description: "Cuts timber", Width: 3, Length: 4,
-			BuildingCategory: "Production",
-			Costs:            []dto.BuildingCost{{ItemID: 7, ItemName: "Stone", Quantity: 20}},
+			BuildingCategory: "Production", PopulationCost: 3,
+			Costs: []dto.BuildingCost{{ItemID: 7, ItemName: "Stone", Quantity: 20}},
 			Productions: []dto.BuildingProductionItem{{
 				BuildingProductionID: 13, ItemID: 8, ItemName: "Wood", Quantity: 6, ProductionTimeSeconds: 120,
 			}},

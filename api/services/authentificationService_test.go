@@ -36,16 +36,11 @@ func seedAuthenticationServicePlayer(t *testing.T, db *gorm.DB) {
 	}
 }
 
-func signedServicePlayerCookie(t *testing.T, subject string, expiry time.Time, key []byte) *http.Cookie {
+func useAuthenticationServiceTestSecret(t *testing.T) {
 	t.Helper()
-	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.RegisteredClaims{
-		Subject: subject, ExpiresAt: jwt.NewNumericDate(expiry),
-	})
-	signed, err := token.SignedString(key)
-	if err != nil {
-		t.Fatal(err)
-	}
-	return &http.Cookie{Name: "auth_token", Value: signed}
+	previous := authentication.JwtSecret
+	authentication.JwtSecret = []byte("service-test-secret-0123456789abcdef")
+	t.Cleanup(func() { authentication.JwtSecret = previous })
 }
 
 func TestRegisterCreatesPlayerWithTrimmedUsernameAndHashedPassword(t *testing.T) {
@@ -138,6 +133,7 @@ func TestRegisterReturnsStorageErrors(t *testing.T) {
 }
 
 func TestLoginReturnsPlayerAndSignedExpiringCookie(t *testing.T) {
+	useAuthenticationServiceTestSecret(t)
 	db := newAuthenticationServiceTestDB(t)
 	seedAuthenticationServicePlayer(t, db)
 	before := time.Now()
@@ -196,37 +192,17 @@ func TestLoginRejectsInvalidCredentialsWithoutCookie(t *testing.T) {
 	}
 }
 
-func TestPlayerByCookieReturnsMatchingPlayer(t *testing.T) {
+func TestPlayerByIDReturnsMatchingPlayer(t *testing.T) {
 	db := newAuthenticationServiceTestDB(t)
 	seedAuthenticationServicePlayer(t, db)
 	execServiceTestSQL(t, db, `INSERT INTO players (id, username, email, password) VALUES (1, 'other', 'other@example.com', 'unused')`)
-	cookie := signedServicePlayerCookie(t, "7", time.Now().Add(time.Hour), authentication.JwtSecret)
-	status, response := PlayerByCookie(cookie)
+	status, response := PlayerByID(7)
 	if status != http.StatusOK || response.Error != "" || !reflect.DeepEqual(response.Player, &dto.Player{Id: 7, Username: "builder"}) {
-		t.Fatalf("PlayerByCookie = (%d, %+v)", status, response)
+		t.Fatalf("PlayerByID = (%d, %+v)", status, response)
 	}
 }
 
-func TestPlayerByCookieRejectsInvalidTokens(t *testing.T) {
-	for _, tc := range []struct {
-		name   string
-		cookie *http.Cookie
-	}{
-		{"empty", &http.Cookie{Name: "auth_token"}},
-		{"malformed", &http.Cookie{Name: "auth_token", Value: "not-a-token"}},
-		{"expired", signedServicePlayerCookie(t, "7", time.Now().Add(-time.Hour), authentication.JwtSecret)},
-		{"wrong signature", signedServicePlayerCookie(t, "7", time.Now().Add(time.Hour), []byte("different-test-key"))},
-	} {
-		t.Run(tc.name, func(t *testing.T) {
-			status, response := PlayerByCookie(tc.cookie)
-			if status != http.StatusUnauthorized || response.Error != "Invalid token" || response.Player != nil {
-				t.Fatalf("PlayerByCookie = (%d, %+v), want invalid token", status, response)
-			}
-		})
-	}
-}
-
-func TestPlayerByCookieReturnsMissingPlayerError(t *testing.T) {
+func TestPlayerByIDReturnsMissingPlayerError(t *testing.T) {
 	for _, unavailable := range []bool{false, true} {
 		name := "unknown player"
 		if unavailable {
@@ -237,10 +213,9 @@ func TestPlayerByCookieReturnsMissingPlayerError(t *testing.T) {
 			if unavailable {
 				execServiceTestSQL(t, db, `DROP TABLE players`)
 			}
-			cookie := signedServicePlayerCookie(t, "999", time.Now().Add(time.Hour), authentication.JwtSecret)
-			status, response := PlayerByCookie(cookie)
+			status, response := PlayerByID(999)
 			if status != http.StatusNotFound || response.Error != "Player not found" || response.Player != nil {
-				t.Fatalf("PlayerByCookie = (%d, %+v), want missing player", status, response)
+				t.Fatalf("PlayerByID = (%d, %+v), want missing player", status, response)
 			}
 		})
 	}

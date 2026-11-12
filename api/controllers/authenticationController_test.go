@@ -5,6 +5,7 @@ import (
 	"API/models"
 	"encoding/json"
 	"net/http"
+	"net/http/httptest"
 	"strings"
 	"testing"
 	"time"
@@ -44,6 +45,30 @@ func authenticationTestCookie(t *testing.T, subject string, expiresAt time.Time,
 		t.Fatal(err)
 	}
 	return &http.Cookie{Name: "auth_token", Value: signed}
+}
+
+func useAuthenticationTestSecret(t *testing.T) {
+	t.Helper()
+	previous := authentication.JwtSecret
+	authentication.JwtSecret = []byte("controller-test-secret-0123456789abcdef")
+	t.Cleanup(func() { authentication.JwtSecret = previous })
+}
+
+// performGetPlayerRequest mounts GetPlayer behind the real AuthMiddleware, the
+// way routing.InitRouter does, because that is where the player ID comes from.
+func performGetPlayerRequest(authorization string, cookies ...*http.Cookie) *httptest.ResponseRecorder {
+	router := gin.New()
+	router.GET("/game/get_player", (&authentication.Server{}).AuthMiddleware(), GetPlayer)
+	request := httptest.NewRequest(http.MethodGet, "/game/get_player", nil)
+	if authorization != "" {
+		request.Header.Set("Authorization", authorization)
+	}
+	for _, cookie := range cookies {
+		request.AddCookie(cookie)
+	}
+	response := httptest.NewRecorder()
+	router.ServeHTTP(response, request)
+	return response
 }
 
 func TestAuthenticationControllersRejectInvalidJSON(t *testing.T) {
@@ -131,6 +156,7 @@ func TestHandleRegisterPropagatesPasswordHashFailure(t *testing.T) {
 }
 
 func TestHandleLoginReturnsPlayerAndUsableAuthenticationCookie(t *testing.T) {
+	useAuthenticationTestSecret(t)
 	db := newAuthenticationControllerTestDB(t)
 	seedAuthenticationPlayer(t, db)
 	before := time.Now()
@@ -165,7 +191,7 @@ func TestHandleLoginReturnsPlayerAndUsableAuthenticationCookie(t *testing.T) {
 	if !claims.ExpiresAt.Time.Equal(cookie.Expires) {
 		t.Errorf("token expiry = %v, cookie expiry = %v", claims.ExpiresAt.Time, cookie.Expires)
 	}
-	playerResponse := performControllerRequest(http.MethodGet, "/game/get_player", "/game/get_player", "", GetPlayer, cookie)
+	playerResponse := performGetPlayerRequest("", cookie)
 	assertControllerJSON(t, playerResponse, http.StatusOK, `{"player":{"id":7,"username":"builder"}}`)
 }
 
@@ -207,31 +233,57 @@ func TestHandleLogoutExpiresAuthenticationCookie(t *testing.T) {
 	}
 }
 
-func TestGetPlayerRequiresAuthenticationCookie(t *testing.T) {
-	response := performControllerRequest(http.MethodGet, "/game/get_player", "/game/get_player", "", GetPlayer)
-	assertControllerError(t, response, http.StatusUnauthorized, "missing auth token")
+func TestGetPlayerRequiresAuthentication(t *testing.T) {
+	response := performGetPlayerRequest("")
+	assertControllerError(t, response, http.StatusUnauthorized, "unauthenticated")
+
+	// Mounted without the middleware there is no player ID, so GetPlayer must refuse.
+	response = performControllerRequest(http.MethodGet, "/game/get_player", "/game/get_player", "", GetPlayer)
+	assertControllerError(t, response, http.StatusUnauthorized, "unauthenticated")
 }
 
 func TestGetPlayerRejectsInvalidAuthenticationCookies(t *testing.T) {
+	useAuthenticationTestSecret(t)
 	for _, tc := range []struct {
 		name   string
 		cookie *http.Cookie
+		error  string
 	}{
-		{name: "malformed", cookie: &http.Cookie{Name: "auth_token", Value: "not-a-token"}},
-		{name: "empty", cookie: &http.Cookie{Name: "auth_token"}},
-		{name: "expired", cookie: authenticationTestCookie(t, "7", time.Now().Add(-time.Hour), authentication.JwtSecret)},
-		{name: "wrong signature", cookie: authenticationTestCookie(t, "7", time.Now().Add(time.Hour), []byte("different-test-secret"))},
+		{name: "malformed", cookie: &http.Cookie{Name: "auth_token", Value: "not-a-token"}, error: "invalid token"},
+		{name: "empty", cookie: &http.Cookie{Name: "auth_token"}, error: "unauthenticated"},
+		{name: "expired", cookie: authenticationTestCookie(t, "7", time.Now().Add(-time.Hour), authentication.JwtSecret), error: "invalid token"},
+		{name: "wrong signature", cookie: authenticationTestCookie(t, "7", time.Now().Add(time.Hour), []byte("different-test-secret")), error: "invalid token"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			response := performControllerRequest(http.MethodGet, "/game/get_player", "/game/get_player", "", GetPlayer, tc.cookie)
-			assertControllerError(t, response, http.StatusUnauthorized, "Invalid token")
+			response := performGetPlayerRequest("", tc.cookie)
+			assertControllerError(t, response, http.StatusUnauthorized, tc.error)
 		})
 	}
 }
 
+func TestGetPlayerRejectsSQLInTokenSubject(t *testing.T) {
+	useAuthenticationTestSecret(t)
+	db := newAuthenticationControllerTestDB(t)
+	seedAuthenticationPlayer(t, db)
+	cookie := authenticationTestCookie(t, "0 UNION SELECT id, password, email, password, created_at, last_login_at, status FROM players -- ",
+		time.Now().Add(time.Hour), authentication.JwtSecret)
+	response := performGetPlayerRequest("", cookie)
+	assertControllerError(t, response, http.StatusUnauthorized, "invalid user id in token")
+}
+
+func TestGetPlayerAcceptsBearerToken(t *testing.T) {
+	useAuthenticationTestSecret(t)
+	db := newAuthenticationControllerTestDB(t)
+	seedAuthenticationPlayer(t, db)
+	token := authenticationTestCookie(t, "7", time.Now().Add(time.Hour), authentication.JwtSecret).Value
+	response := performGetPlayerRequest("Bearer " + token)
+	assertControllerJSON(t, response, http.StatusOK, `{"player":{"id":7,"username":"builder"}}`)
+}
+
 func TestGetPlayerReturnsNotFoundForMissingPlayer(t *testing.T) {
+	useAuthenticationTestSecret(t)
 	newAuthenticationControllerTestDB(t)
 	cookie := authenticationTestCookie(t, "999", time.Now().Add(time.Hour), authentication.JwtSecret)
-	response := performControllerRequest(http.MethodGet, "/game/get_player", "/game/get_player", "", GetPlayer, cookie)
+	response := performGetPlayerRequest("", cookie)
 	assertControllerError(t, response, http.StatusNotFound, "Player not found")
 }

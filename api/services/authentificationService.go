@@ -87,22 +87,9 @@ func Login(request requests.PlayerLoginRequest) (int, responses.PlayerLoginRespo
 	return http.StatusOK, responses.PlayerLoginResponse{Player: &dto.Player{Id: player.ID, Username: player.Username}}, cookie
 }
 
-func PlayerByCookie(cookie *http.Cookie) (int, responses.PlayerByCookieResponse) {
-	token, err := jwt.ParseWithClaims(cookie.Value, &jwt.RegisteredClaims{}, func(token *jwt.Token) (interface{}, error) {
-		return authentication.JwtSecret, nil
-	})
-
-	if err != nil || !token.Valid {
-		return http.StatusUnauthorized, responses.PlayerByCookieResponse{Error: "Invalid token"}
-	}
-
-	claims, ok := token.Claims.(*jwt.RegisteredClaims)
-	if !ok {
-		return http.StatusUnauthorized, responses.PlayerByCookieResponse{Error: "Invalid token claims"}
-	}
-
+func PlayerByID(playerID uint) (int, responses.PlayerByCookieResponse) {
 	var player models.Player
-	if err := database.DB.First(&player, claims.Subject).Error; err != nil {
+	if err := database.DB.First(&player, playerID).Error; err != nil {
 		return http.StatusNotFound, responses.PlayerByCookieResponse{Error: "Player not found"}
 	}
 

@@ -3,6 +3,7 @@ package controllers
 import (
 	"API/api/dto/requests"
 	"API/api/services"
+	"API/authentication"
 	"github.com/gin-gonic/gin"
 	"net/http"
 	"time"
@@ -51,13 +52,13 @@ func HandleLogout(c *gin.Context) {
 }
 
 func GetPlayer(c *gin.Context) {
-	tokenCookie, err := c.Request.Cookie("auth_token")
-	if err != nil {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "missing auth token"})
+	playerID, ok := authentication.PlayerID(c)
+	if !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthenticated"})
 		return
 	}
 
-	var statusCode, response = services.PlayerByCookie(tokenCookie)
+	var statusCode, response = services.PlayerByID(playerID)
 
 	c.JSON(statusCode, response)
 }

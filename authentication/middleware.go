@@ -1,10 +1,10 @@
 package authentication
 
 import (
-	"context"
-	"fmt"
+	"errors"
 	"github.com/golang-jwt/jwt/v5"
 	"net/http"
+	"strconv"
 	"strings"
 
 	"github.com/gin-gonic/gin"
@@ -13,11 +13,19 @@ import (
 type Server struct {
 }
 
-var JwtSecret = []byte("replace-with-a-strong-secret")
-
 type contextKey string
 
-const userIDKey contextKey = "user_id"
+const playerIDKey contextKey = "player_id"
+
+// PlayerID returns the ID of the player that AuthMiddleware authenticated.
+func PlayerID(c *gin.Context) (uint, bool) {
+	value, ok := c.Get(playerIDKey)
+	if !ok {
+		return 0, false
+	}
+	id, ok := value.(uint)
+	return id, ok
+}
 
 func (s *Server) AuthMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
@@ -37,11 +45,12 @@ func (s *Server) AuthMiddleware() gin.HandlerFunc {
 		}
 
 		parsed, err := jwt.Parse(tokenStr, func(t *jwt.Token) (any, error) {
-			if t.Method.Alg() != jwt.SigningMethodHS256.Alg() {
-				return nil, fmt.Errorf("unexpected signing method: %v", t.Header["alg"])
+			// HMAC accepts an empty key, so never verify before InitJwtSecret has run.
+			if len(JwtSecret) < minJwtSecretLength {
+				return nil, errors.New("jwt secret is not configured")
 			}
 			return JwtSecret, nil
-		})
+		}, jwt.WithValidMethods([]string{jwt.SigningMethodHS256.Alg()}), jwt.WithExpirationRequired())
 		if err != nil || !parsed.Valid {
 			c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid token"})
 			c.Abort()
@@ -61,17 +70,16 @@ func (s *Server) AuthMiddleware() gin.HandlerFunc {
 			return
 		}
 
-		var id uint
-		_, err = fmt.Sscanf(sub, "%d", &id)
+		// Unlike Sscanf, ParseUint rejects anything after the digits, so the
+		// subject can only ever be a plain player ID.
+		id, err := strconv.ParseUint(sub, 10, 32)
 		if err != nil {
 			c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid user id in token"})
 			c.Abort()
 			return
 		}
 
-		ctx := context.WithValue(c.Request.Context(), userIDKey, id)
-		c.Request = c.Request.WithContext(ctx)
-		c.Set("user_id", id)
+		c.Set(playerIDKey, uint(id))
 
 		c.Next()
 	}

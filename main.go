@@ -1,6 +1,7 @@
 package main
 
 import (
+	"API/authentication"
 	"API/cron"
 	"API/database"
 	"API/redis"
@@ -9,6 +10,7 @@ import (
 )
 
 func main() {
+	authentication.InitJwtSecret()
 	database.InitDB()
 	redis.InitRedis()
 	cron.StartCronJobs(context.Background())

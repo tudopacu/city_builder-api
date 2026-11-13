@@ -12,12 +12,9 @@ import (
 
 func newStartProductionTestDB(t *testing.T) *gorm.DB {
 	t.Helper()
-	db := newCollectionTestDB(t)
+	db := newCollectionTestDB(t) // includes building 10 of player 1
 	execBuildingTestSQL(t, db,
-		`CREATE TABLE player_buildings (id INTEGER PRIMARY KEY, player_id INTEGER, building_id INTEGER, map_id INTEGER,
-			building_level_id INTEGER, x INTEGER, y INTEGER, created_at DATETIME, updated_at DATETIME)`,
 		`CREATE TABLE items (id INTEGER PRIMARY KEY, name TEXT, type TEXT)`,
-		`INSERT INTO player_buildings (id, player_id, building_id) VALUES (10, 1, 20)`,
 		`INSERT INTO items (id, name, type) VALUES (7, 'Wood', 'resource')`,
 		`INSERT INTO building_productions (id, building_id, item_id, production_time_seconds, quantity) VALUES (30, 20, 7, 60, 5)`,
 	)
@@ -84,6 +81,7 @@ func TestStartProductionRejectsMissingMismatchedAndActiveProductions(t *testing.
 		status               int
 	}{
 		{"missing player building", "DELETE FROM player_buildings", "player building not found", http.StatusNotFound},
+		{"another player's building", "UPDATE player_buildings SET player_id = 2", "player building not found", http.StatusNotFound},
 		{"missing recipe", "DELETE FROM building_productions", "building production not found", http.StatusNotFound},
 		{"recipe belongs to different building", "UPDATE building_productions SET building_id = 21", "building production does not belong to this building", http.StatusBadRequest},
 		{"pending", `INSERT INTO player_building_productions (player_id, player_building_id, building_production_id, status)
@@ -131,7 +129,7 @@ func TestCollectProductionRejectsInvalidRecipeQuantity(t *testing.T) {
 }
 
 func TestCollectProductionReportsReadFailuresWithoutCompletingProduction(t *testing.T) {
-	for _, table := range []string{"building_productions", "player_inventories", "player_inventory_items"} {
+	for _, table := range []string{"player_buildings", "building_productions", "player_inventories", "player_inventory_items"} {
 		t.Run(table, func(t *testing.T) {
 			db := newCollectionTestDB(t)
 			seedCollection(t, db, 5, "DONE", time.Now().Add(-time.Hour),

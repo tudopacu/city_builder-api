@@ -8,9 +8,8 @@ import (
 )
 
 func GetRoads(c *gin.Context) {
-	playerID, err := strconv.ParseUint(c.Param("player_id"), 10, 32)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid player_id"})
+	playerID, ok := requirePlayerID(c)
+	if !ok {
 		return
 	}
 
@@ -20,7 +19,7 @@ func GetRoads(c *gin.Context) {
 		return
 	}
 
-	roads, err := services.GetRoadsByPlayerAndMap(uint(playerID), uint(mapID))
+	roads, err := services.GetRoadsByPlayerAndMap(playerID, uint(mapID))
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return

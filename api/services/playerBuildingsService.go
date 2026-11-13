@@ -169,9 +169,9 @@ func checkBuildingOverlap(tx *gorm.DB, mapID uint, x, y, width, length int) erro
 	return nil
 }
 
-func createPlayerBuilding(tx *gorm.DB, request requests.AddBuildingRequest, buildingLevelID uint) (*models.PlayerBuilding, error) {
+func createPlayerBuilding(tx *gorm.DB, playerID uint, request requests.AddBuildingRequest, buildingLevelID uint) (*models.PlayerBuilding, error) {
 	playerBuilding := models.PlayerBuilding{
-		PlayerID:        request.PlayerID,
+		PlayerID:        playerID,
 		BuildingID:      request.BuildingID,
 		MapID:           request.MapID,
 		BuildingLevelID: buildingLevelID,
@@ -180,7 +180,7 @@ func createPlayerBuilding(tx *gorm.DB, request requests.AddBuildingRequest, buil
 	}
 
 	if err := tx.Create(&playerBuilding).Error; err != nil {
-		log.Default().Printf("failed to create player building for player_id %d: %s", request.PlayerID, err)
+		log.Default().Printf("failed to create player building for player_id %d: %s", playerID, err)
 		return nil, fmt.Errorf("failed to place building")
 	}
 
@@ -195,10 +195,13 @@ func loadPlayerBuildingWithAssociations(tx *gorm.DB, playerBuilding *models.Play
 	return nil
 }
 
-func DeletePlayerBuilding(playerBuildingID uint) (int, error) {
+func DeletePlayerBuilding(playerID, playerBuildingID uint) (int, error) {
 	err := database.DB.Transaction(func(tx *gorm.DB) error {
+		// Another player's building is reported as not found, the same as a missing one.
 		var playerBuilding models.PlayerBuilding
-		if err := tx.Preload("Building.Category").Preload("BuildingLevel").First(&playerBuilding, playerBuildingID).Error; err != nil {
+		if err := tx.Preload("Building.Category").Preload("BuildingLevel").
+			Where("player_id = ?", playerID).
+			First(&playerBuilding, playerBuildingID).Error; err != nil {
 			return err
 		}
 
@@ -253,7 +256,7 @@ func DeletePlayerBuilding(playerBuildingID uint) (int, error) {
 	return http.StatusOK, nil
 }
 
-func AddPlayerBuilding(request requests.AddBuildingRequest) (int, responses.AddPlayerBuildingResponse) {
+func AddPlayerBuilding(playerID uint, request requests.AddBuildingRequest) (int, responses.AddPlayerBuildingResponse) {
 	// Validate coordinates are non-negative
 	if err := validateCoordinates(request.X, request.Y); err != nil {
 		return http.StatusBadRequest, responses.AddPlayerBuildingResponse{Error: err.Error()}
@@ -265,7 +268,7 @@ func AddPlayerBuilding(request requests.AddBuildingRequest) (int, responses.AddP
 		// Serialize building changes per player before reading anything. This keeps
 		// the overlap and population checks below from racing with another request,
 		// and keeps the lock order the same as in DeletePlayerBuilding.
-		if err := lockPlayerForPopulation(tx, request.PlayerID); err != nil {
+		if err := lockPlayerForPopulation(tx, playerID); err != nil {
 			return err
 		}
 
@@ -294,24 +297,24 @@ func AddPlayerBuilding(request requests.AddBuildingRequest) (int, responses.AddP
 		// Housing costs no population, every other building needs free population
 		// for as long as it exists.
 		if populationStatus, err := ensurePopulationAvailable(
-			tx, request.PlayerID, request.MapID, buildingLevel.PopulationCost,
+			tx, playerID, request.MapID, buildingLevel.PopulationCost,
 		); err != nil {
 			statusCode = populationStatus
 			return err
 		}
 
-		if costStatus, err := consumeBuildingConstructionCosts(tx, request.PlayerID, request.BuildingID); err != nil {
+		if costStatus, err := consumeBuildingConstructionCosts(tx, playerID, request.BuildingID); err != nil {
 			statusCode = costStatus
 			return err
 		}
 
-		playerBuilding, err = createPlayerBuilding(tx, request, buildingLevel.ID)
+		playerBuilding, err = createPlayerBuilding(tx, playerID, request, buildingLevel.ID)
 		if err != nil {
 			return err
 		}
 		if building.Category.Name == "Storage" {
 			inventory := models.PlayerInventory{
-				PlayerID:         request.PlayerID,
+				PlayerID:         playerID,
 				MapID:            request.MapID,
 				PlayerBuildingID: playerBuilding.ID,
 				Capacity:         buildingLevel.Capacity,
@@ -324,7 +327,7 @@ func AddPlayerBuilding(request requests.AddBuildingRequest) (int, responses.AddP
 	})
 	if err != nil {
 		if statusCode == http.StatusInternalServerError {
-			log.Default().Printf("failed to add building_id %d for player_id %d: %s", request.BuildingID, request.PlayerID, err)
+			log.Default().Printf("failed to add building_id %d for player_id %d: %s", request.BuildingID, playerID, err)
 			return statusCode, responses.AddPlayerBuildingResponse{Error: "failed to place building"}
 		}
 		return statusCode, responses.AddPlayerBuildingResponse{Error: err.Error()}

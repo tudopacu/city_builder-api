@@ -18,7 +18,7 @@ func newRoadsControllerTestDB(t *testing.T) *gorm.DB {
 	)
 }
 
-func TestGetRoadsReturnsDetailsForRequestedPlayerAndMap(t *testing.T) {
+func TestGetRoadsReturnsDetailsForAuthenticatedPlayerAndMap(t *testing.T) {
 	db := newRoadsControllerTestDB(t)
 	execControllerSQL(t, db,
 		`INSERT INTO road_types (id, type, image_url) VALUES (3, 'Stone', '/images/stone-road.png')`,
@@ -30,7 +30,7 @@ func TestGetRoadsReturnsDetailsForRequestedPlayerAndMap(t *testing.T) {
 			(5, 11, 12, 3), (6, 21, 22, 3), (7, 31, 32, 3)`,
 	)
 
-	response := performControllerRequest(http.MethodGet, "/game/roads/:player_id/:map_id", "/game/roads/2/9", "", GetRoads)
+	response := performPlayerRequest(t, 2, http.MethodGet, "/game/roads/:map_id", "/game/roads/9", "", GetRoads)
 	assertControllerJSON(t, response, http.StatusOK, `{"roads":[{
 		"id":5,"start_intersection":{"id":11,"x":4,"y":5},"end_intersection":{"id":12,"x":7,"y":8},
 		"road_type":{"id":3,"type":"Stone","image_url":"/images/stone-road.png"}
@@ -44,31 +44,22 @@ func TestGetRoadsReturnsEmptyArray(t *testing.T) {
 		`INSERT INTO roads (id, start_intersection_id, end_intersection_id) VALUES (1, 1, 1), (2, 2, 2)`,
 	)
 
-	response := performControllerRequest(http.MethodGet, "/game/roads/:player_id/:map_id", "/game/roads/2/9", "", GetRoads)
+	response := performPlayerRequest(t, 2, http.MethodGet, "/game/roads/:map_id", "/game/roads/9", "", GetRoads)
 	assertControllerJSON(t, response, http.StatusOK, `{"roads":[]}`)
 }
 
-func TestGetRoadsRejectsInvalidIDs(t *testing.T) {
-	for _, parameter := range []string{"player_id", "map_id"} {
-		for _, value := range []string{"abc", "-1", "1.5", "4294967296"} {
-			t.Run(parameter+"/"+value, func(t *testing.T) {
-				playerID, mapID := "2", "9"
-				if parameter == "player_id" {
-					playerID = value
-				} else {
-					mapID = value
-				}
-				response := performControllerRequest(http.MethodGet, "/game/roads/:player_id/:map_id",
-					"/game/roads/"+playerID+"/"+mapID, "", GetRoads)
-				assertControllerError(t, response, http.StatusBadRequest, "invalid "+parameter)
-			})
-		}
+func TestGetRoadsRejectsInvalidMapID(t *testing.T) {
+	for _, value := range []string{"abc", "-1", "1.5", "4294967296"} {
+		t.Run(value, func(t *testing.T) {
+			response := performPlayerRequest(t, 2, http.MethodGet, "/game/roads/:map_id", "/game/roads/"+value, "", GetRoads)
+			assertControllerError(t, response, http.StatusBadRequest, "invalid map_id")
+		})
 	}
 }
 
 func TestGetRoadsReturnsDatabaseError(t *testing.T) {
 	newControllerTestDB(t)
 
-	response := performControllerRequest(http.MethodGet, "/game/roads/:player_id/:map_id", "/game/roads/2/9", "", GetRoads)
+	response := performPlayerRequest(t, 2, http.MethodGet, "/game/roads/:map_id", "/game/roads/9", "", GetRoads)
 	assertControllerError(t, response, http.StatusInternalServerError, "failed to fetch roads for player_id 2 on map_id 9")
 }

@@ -8,9 +8,8 @@ import (
 )
 
 func StartBuildingProduction(c *gin.Context) {
-	playerID, err := strconv.ParseUint(c.Param("player_id"), 10, 32)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid player_id"})
+	playerID, ok := requirePlayerID(c)
+	if !ok {
 		return
 	}
 
@@ -26,7 +25,7 @@ func StartBuildingProduction(c *gin.Context) {
 		return
 	}
 
-	statusCode, response, serviceErr := services.StartProduction(uint(playerID), uint(playerBuildingID), uint(buildingProductionID))
+	statusCode, response, serviceErr := services.StartProduction(playerID, uint(playerBuildingID), uint(buildingProductionID))
 	if serviceErr != nil {
 		c.JSON(statusCode, gin.H{"error": serviceErr.Error()})
 		return
@@ -36,9 +35,8 @@ func StartBuildingProduction(c *gin.Context) {
 }
 
 func CollectBuildingProduction(c *gin.Context) {
-	playerID, err := strconv.ParseUint(c.Param("player_id"), 10, 32)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid player_id"})
+	playerID, ok := requirePlayerID(c)
+	if !ok {
 		return
 	}
 
@@ -54,7 +52,7 @@ func CollectBuildingProduction(c *gin.Context) {
 		return
 	}
 
-	statusCode, serviceErr := services.CollectProduction(uint(playerID), uint(playerBuildingID), uint(buildingProductionID))
+	statusCode, serviceErr := services.CollectProduction(playerID, uint(playerBuildingID), uint(buildingProductionID))
 	if serviceErr != nil {
 		c.JSON(statusCode, gin.H{"error": serviceErr.Error()})
 		return

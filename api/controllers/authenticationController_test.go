@@ -47,13 +47,6 @@ func authenticationTestCookie(t *testing.T, subject string, expiresAt time.Time,
 	return &http.Cookie{Name: "auth_token", Value: signed}
 }
 
-func useAuthenticationTestSecret(t *testing.T) {
-	t.Helper()
-	previous := authentication.JwtSecret
-	authentication.JwtSecret = []byte("controller-test-secret-0123456789abcdef")
-	t.Cleanup(func() { authentication.JwtSecret = previous })
-}
-
 // performGetPlayerRequest mounts GetPlayer behind the real AuthMiddleware, the
 // way routing.InitRouter does, because that is where the player ID comes from.
 func performGetPlayerRequest(authorization string, cookies ...*http.Cookie) *httptest.ResponseRecorder {

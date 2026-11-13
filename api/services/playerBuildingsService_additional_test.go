@@ -125,7 +125,7 @@ func TestAddPlayerBuildingAcceptsOriginAndCreatesStorageInventory(t *testing.T) 
 	)
 	request := buildingTestRequest()
 	request.X, request.Y = 0, 0
-	status, response := AddPlayerBuilding(request)
+	status, response := AddPlayerBuilding(1, request)
 	if status != http.StatusCreated || response.Error != "" || response.PlayerBuilding == nil {
 		t.Fatalf("status = %d, response = %+v", status, response)
 	}
@@ -137,7 +137,7 @@ func TestAddPlayerBuildingAcceptsOriginAndCreatesStorageInventory(t *testing.T) 
 		t.Fatalf("stored state = %+v", after)
 	}
 	inventory := after.Inventories[0]
-	if inventory.PlayerBuildingID != response.PlayerBuilding.ID || inventory.PlayerID != request.PlayerID ||
+	if inventory.PlayerBuildingID != response.PlayerBuilding.ID || inventory.PlayerID != 1 ||
 		inventory.MapID != request.MapID || inventory.Capacity != 75 {
 		t.Fatalf("storage inventory = %+v", inventory)
 	}
@@ -152,7 +152,7 @@ func TestAddPlayerBuildingRejectsNegativeCoordinates(t *testing.T) {
 			} else {
 				request.Y = -1
 			}
-			status, response := AddPlayerBuilding(request)
+			status, response := AddPlayerBuilding(1, request)
 			if status != http.StatusBadRequest || response.Error != "coordinates must be non-negative" || response.PlayerBuilding != nil {
 				t.Fatalf("status = %d, response = %+v", status, response)
 			}
@@ -200,7 +200,7 @@ func TestAddPlayerBuildingValidatesRectangularFootprint(t *testing.T) {
 				}
 			}
 			before := snapshotBuildingTest(t, db)
-			status, response := AddPlayerBuilding(buildingTestRequest())
+			status, response := AddPlayerBuilding(1, buildingTestRequest())
 			after := snapshotBuildingTest(t, db)
 			if tc.wantError != "" {
 				if status != http.StatusBadRequest || response.Error != tc.wantError || response.PlayerBuilding != nil {
@@ -251,7 +251,7 @@ func TestAddPlayerBuildingReportsMissingRecordsAndReadFailures(t *testing.T) {
 				`INSERT INTO building_construction_costs (building_id, item_id, quantity) VALUES (30, 7, 3)`,
 				tc.setup,
 			)
-			status, response := AddPlayerBuilding(buildingTestRequest())
+			status, response := AddPlayerBuilding(1, buildingTestRequest())
 			if status != tc.status || response.Error != tc.message || response.PlayerBuilding != nil {
 				t.Fatalf("status = %d, response = %+v; want %d, %q", status, response, tc.status, tc.message)
 			}
@@ -278,7 +278,7 @@ func TestAddPlayerBuildingRollsBackStorageAndReloadFailures(t *testing.T) {
 				tc.setup,
 			)
 			before := snapshotBuildingTest(t, db)
-			status, response := AddPlayerBuilding(buildingTestRequest())
+			status, response := AddPlayerBuilding(1, buildingTestRequest())
 			if status != http.StatusInternalServerError || response.Error != "failed to place building" || response.PlayerBuilding != nil {
 				t.Fatalf("status = %d, response = %+v", status, response)
 			}
@@ -313,7 +313,7 @@ func TestDeletePlayerBuildingRemovesOnlySelectedBuildingAndStorage(t *testing.T)
 		t.Run(category, func(t *testing.T) {
 			db := newBuildingTestDB(t)
 			seedDeleteBuildingTest(t, db, category)
-			status, err := DeletePlayerBuilding(10)
+			status, err := DeletePlayerBuilding(1, 10)
 			if status != http.StatusOK || err != nil {
 				t.Fatalf("status = %d, err = %v", status, err)
 			}
@@ -327,12 +327,30 @@ func TestDeletePlayerBuildingRemovesOnlySelectedBuildingAndStorage(t *testing.T)
 					t.Fatalf("remaining storage = %+v", after)
 				}
 			}
-			status, err = DeletePlayerBuilding(10)
+			status, err = DeletePlayerBuilding(1, 10)
 			if status != http.StatusNotFound || err == nil || err.Error() != "player building not found" {
 				t.Fatalf("repeat deletion: status = %d, err = %v", status, err)
 			}
 			if !reflect.DeepEqual(snapshotBuildingTest(t, db), after) {
 				t.Fatal("repeat deletion changed unrelated state")
+			}
+		})
+	}
+}
+
+func TestDeletePlayerBuildingRejectsAnotherPlayersBuilding(t *testing.T) {
+	for _, category := range []string{"Production", "Storage"} {
+		t.Run(category, func(t *testing.T) {
+			db := newBuildingTestDB(t)
+			seedDeleteBuildingTest(t, db, category)
+			before := snapshotBuildingTest(t, db)
+			// Building 20 belongs to player 2.
+			status, err := DeletePlayerBuilding(1, 20)
+			if status != http.StatusNotFound || err == nil || err.Error() != "player building not found" {
+				t.Fatalf("status = %d, err = %v; want 404 player building not found", status, err)
+			}
+			if !reflect.DeepEqual(snapshotBuildingTest(t, db), before) {
+				t.Fatal("refused deletion changed buildings or storage")
 			}
 		})
 	}
@@ -352,7 +370,7 @@ func TestDeletePlayerBuildingRollsBackDeleteFailures(t *testing.T) {
 			seedDeleteBuildingTest(t, db, "Storage")
 			execBuildingTestSQL(t, db, tc.trigger)
 			before := snapshotBuildingTest(t, db)
-			status, err := DeletePlayerBuilding(10)
+			status, err := DeletePlayerBuilding(1, 10)
 			if status != http.StatusInternalServerError || err == nil || err.Error() != "failed to delete player building" {
 				t.Fatalf("status = %d, err = %v", status, err)
 			}
@@ -369,7 +387,7 @@ func TestDeletePlayerBuildingReportsReadFailures(t *testing.T) {
 			db := newBuildingTestDB(t)
 			seedDeleteBuildingTest(t, db, "Storage")
 			execBuildingTestSQL(t, db, "DROP TABLE "+table)
-			status, err := DeletePlayerBuilding(10)
+			status, err := DeletePlayerBuilding(1, 10)
 			if status != http.StatusInternalServerError || err == nil || err.Error() != "failed to delete player building" {
 				t.Fatalf("status = %d, err = %v", status, err)
 			}

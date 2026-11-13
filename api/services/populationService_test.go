@@ -66,7 +66,7 @@ func TestPopulationIsZeroWithoutBuildings(t *testing.T) {
 func TestAddPlayerBuildingRequiresFreePopulation(t *testing.T) {
 	db := seedPopulationFixture(t, 2, 5)
 
-	status, response := AddPlayerBuilding(buildingTestRequest())
+	status, response := AddPlayerBuilding(1, buildingTestRequest())
 
 	if status != http.StatusBadRequest || !strings.Contains(response.Error, "not enough population") {
 		t.Fatalf("status = %d, response = %+v, want 400 with a population error", status, response)
@@ -81,13 +81,13 @@ func TestHousingProvidesPopulationThatBuildingsUseAndRelease(t *testing.T) {
 	insertPopulationBuilding(t, db, 100, 40, 41, 1, 8, 8)
 	requirePopulation(t, 1, 1, dto.Population{Total: 5, Used: 0, Available: 5})
 
-	status, response := AddPlayerBuilding(buildingTestRequest())
+	status, response := AddPlayerBuilding(1, buildingTestRequest())
 	if status != http.StatusCreated || response.PlayerBuilding == nil {
 		t.Fatalf("status = %d, response = %+v, want 201", status, response)
 	}
 	requirePopulation(t, 1, 1, dto.Population{Total: 5, Used: 2, Available: 3})
 
-	deleteStatus, err := DeletePlayerBuilding(response.PlayerBuilding.ID)
+	deleteStatus, err := DeletePlayerBuilding(1, response.PlayerBuilding.ID)
 	if deleteStatus != http.StatusOK || err != nil {
 		t.Fatalf("status = %d, err = %v, want 200", deleteStatus, err)
 	}
@@ -101,7 +101,7 @@ func TestAddPlayerBuildingStopsWhenPopulationRunsOut(t *testing.T) {
 	insertPopulationBuilding(t, db, 101, 30, 31, 1, 9, 9)
 	requirePopulation(t, 1, 1, dto.Population{Total: 3, Used: 2, Available: 1})
 
-	status, response := AddPlayerBuilding(buildingTestRequest())
+	status, response := AddPlayerBuilding(1, buildingTestRequest())
 
 	if status != http.StatusBadRequest || !strings.Contains(response.Error, "required 2, available 1") {
 		t.Fatalf("status = %d, response = %+v, want 400 with required 2, available 1", status, response)
@@ -115,7 +115,7 @@ func TestHousingBuildsWithoutPopulation(t *testing.T) {
 	db := seedPopulationFixture(t, 2, 5)
 	execBuildingTestSQL(t, db, `INSERT INTO terrains (id, map_id, tile_id, x, y) VALUES (2, 1, 1, 6, 6)`)
 
-	status, response := AddPlayerBuilding(requests.AddBuildingRequest{PlayerID: 1, BuildingID: 40, MapID: 1, X: 6, Y: 6})
+	status, response := AddPlayerBuilding(1, requests.AddBuildingRequest{BuildingID: 40, MapID: 1, X: 6, Y: 6})
 
 	if status != http.StatusCreated || response.PlayerBuilding == nil {
 		t.Fatalf("status = %d, response = %+v, want 201", status, response)
@@ -130,7 +130,7 @@ func TestRemovingHousingIsBlockedWhilePopulationIsInUse(t *testing.T) {
 	insertPopulationBuilding(t, db, 102, 30, 31, 1, 10, 10)
 	requirePopulation(t, 1, 1, dto.Population{Total: 5, Used: 4, Available: 1})
 
-	status, err := DeletePlayerBuilding(100)
+	status, err := DeletePlayerBuilding(1, 100)
 
 	if status != http.StatusConflict || err == nil || !strings.Contains(err.Error(), "cannot remove housing") {
 		t.Fatalf("status = %d, err = %v, want 409 with a housing error", status, err)
@@ -141,7 +141,7 @@ func TestRemovingHousingIsBlockedWhilePopulationIsInUse(t *testing.T) {
 
 	// Once the sawmills are gone the housing can be removed too.
 	for _, id := range []uint{101, 102, 100} {
-		if deleteStatus, deleteErr := DeletePlayerBuilding(id); deleteStatus != http.StatusOK || deleteErr != nil {
+		if deleteStatus, deleteErr := DeletePlayerBuilding(1, id); deleteStatus != http.StatusOK || deleteErr != nil {
 			t.Fatalf("delete %d: status = %d, err = %v, want 200", id, deleteStatus, deleteErr)
 		}
 	}
@@ -155,7 +155,7 @@ func TestRemovingHousingIsAllowedWhenOtherHousingCoversThePopulation(t *testing.
 	insertPopulationBuilding(t, db, 102, 30, 31, 1, 9, 9)
 	requirePopulation(t, 1, 1, dto.Population{Total: 10, Used: 2, Available: 8})
 
-	status, err := DeletePlayerBuilding(100)
+	status, err := DeletePlayerBuilding(1, 100)
 
 	if status != http.StatusOK || err != nil {
 		t.Fatalf("status = %d, err = %v, want 200", status, err)

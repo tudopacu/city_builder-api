@@ -51,10 +51,20 @@ func HandleLogout(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "logged out"})
 }
 
-func GetPlayer(c *gin.Context) {
+// requirePlayerID returns the player that AuthMiddleware authenticated. Handlers
+// must take the player from here, never from the request. When there is no
+// player it has already responded with 401, so the handler only has to return.
+func requirePlayerID(c *gin.Context) (uint, bool) {
 	playerID, ok := authentication.PlayerID(c)
 	if !ok {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthenticated"})
+	}
+	return playerID, ok
+}
+
+func GetPlayer(c *gin.Context) {
+	playerID, ok := requirePlayerID(c)
+	if !ok {
 		return
 	}
 

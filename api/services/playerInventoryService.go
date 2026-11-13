@@ -58,14 +58,14 @@ func totalInventoryQuantity(items []models.PlayerInventoryItem) int {
 	return total
 }
 
-func AddInventoryItem(request requests.AddInventoryItemRequest) (int, responses.AddInventoryItemResponse) {
+func AddInventoryItem(playerID uint, request requests.AddInventoryItemRequest) (int, responses.AddInventoryItemResponse) {
 	// Load inventory and verify it belongs to the player
 	inventory, err := loadInventoryWithAssociations(request.InventoryID)
 	if err != nil {
 		return http.StatusNotFound, responses.AddInventoryItemResponse{Error: "inventory not found"}
 	}
 
-	if inventory.PlayerID != request.PlayerID {
+	if inventory.PlayerID != playerID {
 		return http.StatusForbidden, responses.AddInventoryItemResponse{Error: "inventory does not belong to player"}
 	}
 

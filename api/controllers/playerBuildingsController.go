@@ -9,9 +9,8 @@ import (
 )
 
 func GetPlayerBuildings(c *gin.Context) {
-	playerId, err := strconv.ParseUint(c.Param("player_id"), 10, 32)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid player_id"})
+	playerId, ok := requirePlayerID(c)
+	if !ok {
 		return
 	}
 
@@ -21,7 +20,7 @@ func GetPlayerBuildings(c *gin.Context) {
 		return
 	}
 
-	playerBuildingDTOs, err := services.GetPlayerBuildings(uint(playerId), uint(mapId))
+	playerBuildingDTOs, err := services.GetPlayerBuildings(playerId, uint(mapId))
 
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err})
@@ -32,9 +31,8 @@ func GetPlayerBuildings(c *gin.Context) {
 }
 
 func GetPlayerPopulation(c *gin.Context) {
-	playerId, err := strconv.ParseUint(c.Param("player_id"), 10, 32)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid player_id"})
+	playerId, ok := requirePlayerID(c)
+	if !ok {
 		return
 	}
 
@@ -44,7 +42,7 @@ func GetPlayerPopulation(c *gin.Context) {
 		return
 	}
 
-	population, err := services.GetPlayerPopulation(uint(playerId), uint(mapId))
+	population, err := services.GetPlayerPopulation(playerId, uint(mapId))
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -54,13 +52,18 @@ func GetPlayerPopulation(c *gin.Context) {
 }
 
 func DeletePlayerBuilding(c *gin.Context) {
+	playerID, ok := requirePlayerID(c)
+	if !ok {
+		return
+	}
+
 	playerBuildingID, err := strconv.ParseUint(c.Param("player_building_id"), 10, 32)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid player_building_id"})
 		return
 	}
 
-	statusCode, serviceErr := services.DeletePlayerBuilding(uint(playerBuildingID))
+	statusCode, serviceErr := services.DeletePlayerBuilding(playerID, uint(playerBuildingID))
 	if serviceErr != nil {
 		c.JSON(statusCode, gin.H{"error": serviceErr.Error()})
 		return
@@ -70,6 +73,11 @@ func DeletePlayerBuilding(c *gin.Context) {
 }
 
 func AddPlayerBuilding(c *gin.Context) {
+	playerID, ok := requirePlayerID(c)
+	if !ok {
+		return
+	}
+
 	var request requests.AddBuildingRequest
 
 	if err := c.BindJSON(&request); err != nil {
@@ -77,6 +85,6 @@ func AddPlayerBuilding(c *gin.Context) {
 		return
 	}
 
-	statusCode, response := services.AddPlayerBuilding(request)
+	statusCode, response := services.AddPlayerBuilding(playerID, request)
 	c.JSON(statusCode, response)
 }

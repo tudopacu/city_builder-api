@@ -46,8 +46,8 @@ func readControllerInventoryItems(t *testing.T, db *gorm.DB) []controllerInvento
 
 func TestAddInventoryItemCreatesEntryAndReturnsUpdatedInventory(t *testing.T) {
 	db := newAddInventoryItemControllerTestDB(t)
-	response := performControllerRequest(http.MethodPost, "/game/add_inventory_item", "/game/add_inventory_item",
-		`{"player_id":1,"inventory_id":10,"item_id":9,"quantity":11}`, AddInventoryItem)
+	response := performPlayerRequest(t, 1, http.MethodPost, "/game/add_inventory_item", "/game/add_inventory_item",
+		`{"inventory_id":10,"item_id":9,"quantity":11}`, AddInventoryItem)
 	if response.Code != http.StatusOK {
 		t.Fatalf("status = %d, want 200; body = %s", response.Code, response.Body.String())
 	}
@@ -76,8 +76,8 @@ func TestAddInventoryItemCreatesEntryAndReturnsUpdatedInventory(t *testing.T) {
 
 func TestAddInventoryItemIncrementsExistingEntryUpToCapacity(t *testing.T) {
 	db := newAddInventoryItemControllerTestDB(t)
-	response := performControllerRequest(http.MethodPost, "/game/add_inventory_item", "/game/add_inventory_item",
-		`{"player_id":1,"inventory_id":10,"item_id":7,"quantity":11}`, AddInventoryItem)
+	response := performPlayerRequest(t, 1, http.MethodPost, "/game/add_inventory_item", "/game/add_inventory_item",
+		`{"inventory_id":10,"item_id":7,"quantity":11}`, AddInventoryItem)
 	assertControllerJSON(t, response, http.StatusOK, `{"player_inventory":{
 		"id":10,"player_building_id":0,"capacity":20,"items":[
 			{"id":100,"item_id":7,"quantity":16},
@@ -95,26 +95,24 @@ func TestAddInventoryItemRejectsInvalidRequests(t *testing.T) {
 		body string
 	}{
 		{"empty body", ""},
-		{"malformed JSON", `{"player_id":`},
+		{"malformed JSON", `{"inventory_id":`},
 		{"array body", `[]`},
 		{"null body", `null`},
 		{"empty object", `{}`},
-		{"missing player", `{"inventory_id":10,"item_id":7,"quantity":1}`},
-		{"missing inventory", `{"player_id":1,"item_id":7,"quantity":1}`},
-		{"missing item", `{"player_id":1,"inventory_id":10,"quantity":1}`},
-		{"missing quantity", `{"player_id":1,"inventory_id":10,"item_id":7}`},
-		{"zero player", `{"player_id":0,"inventory_id":10,"item_id":7,"quantity":1}`},
-		{"zero inventory", `{"player_id":1,"inventory_id":0,"item_id":7,"quantity":1}`},
-		{"zero item", `{"player_id":1,"inventory_id":10,"item_id":0,"quantity":1}`},
-		{"zero quantity", `{"player_id":1,"inventory_id":10,"item_id":7,"quantity":0}`},
-		{"negative quantity", `{"player_id":1,"inventory_id":10,"item_id":7,"quantity":-1}`},
-		{"negative player", `{"player_id":-1,"inventory_id":10,"item_id":7,"quantity":1}`},
-		{"string inventory", `{"player_id":1,"inventory_id":"10","item_id":7,"quantity":1}`},
-		{"fractional item", `{"player_id":1,"inventory_id":10,"item_id":7.5,"quantity":1}`},
-		{"string quantity", `{"player_id":1,"inventory_id":10,"item_id":7,"quantity":"1"}`},
+		{"missing inventory", `{"item_id":7,"quantity":1}`},
+		{"missing item", `{"inventory_id":10,"quantity":1}`},
+		{"missing quantity", `{"inventory_id":10,"item_id":7}`},
+		{"zero inventory", `{"inventory_id":0,"item_id":7,"quantity":1}`},
+		{"zero item", `{"inventory_id":10,"item_id":0,"quantity":1}`},
+		{"zero quantity", `{"inventory_id":10,"item_id":7,"quantity":0}`},
+		{"negative quantity", `{"inventory_id":10,"item_id":7,"quantity":-1}`},
+		{"negative inventory", `{"inventory_id":-1,"item_id":7,"quantity":1}`},
+		{"string inventory", `{"inventory_id":"10","item_id":7,"quantity":1}`},
+		{"fractional item", `{"inventory_id":10,"item_id":7.5,"quantity":1}`},
+		{"string quantity", `{"inventory_id":10,"item_id":7,"quantity":"1"}`},
 	} {
 		t.Run(test.name, func(t *testing.T) {
-			response := performControllerRequest(http.MethodPost, "/game/add_inventory_item", "/game/add_inventory_item", test.body, AddInventoryItem)
+			response := performPlayerRequest(t, 1, http.MethodPost, "/game/add_inventory_item", "/game/add_inventory_item", test.body, AddInventoryItem)
 			assertControllerError(t, response, http.StatusBadRequest, "invalid request")
 		})
 	}
@@ -127,21 +125,24 @@ func TestAddInventoryItemReturnsServiceErrorsWithoutChangingInventory(t *testing
 		status  int
 		message string
 	}{
-		{"missing inventory", `{"player_id":1,"inventory_id":99,"item_id":7,"quantity":1}`,
+		{"missing inventory", `{"inventory_id":99,"item_id":7,"quantity":1}`,
 			http.StatusNotFound, "inventory not found"},
-		{"wrong player", `{"player_id":2,"inventory_id":10,"item_id":7,"quantity":1}`,
+		// Inventory 20 belongs to player 2, and these requests come from player 1.
+		{"another player's inventory", `{"inventory_id":20,"item_id":7,"quantity":1}`,
 			http.StatusForbidden, "inventory does not belong to player"},
-		{"missing item", `{"player_id":1,"inventory_id":10,"item_id":99,"quantity":1}`,
+		{"player_id in body is ignored", `{"player_id":2,"inventory_id":20,"item_id":7,"quantity":1}`,
+			http.StatusForbidden, "inventory does not belong to player"},
+		{"missing item", `{"inventory_id":10,"item_id":99,"quantity":1}`,
 			http.StatusNotFound, "item not found"},
-		{"existing item exceeds capacity", `{"player_id":1,"inventory_id":10,"item_id":7,"quantity":12}`,
+		{"existing item exceeds capacity", `{"inventory_id":10,"item_id":7,"quantity":12}`,
 			http.StatusBadRequest, "not enough capacity: available 11, requested 12"},
-		{"new item exceeds capacity", `{"player_id":1,"inventory_id":10,"item_id":9,"quantity":12}`,
+		{"new item exceeds capacity", `{"inventory_id":10,"item_id":9,"quantity":12}`,
 			http.StatusBadRequest, "not enough capacity: available 11, requested 12"},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			db := newAddInventoryItemControllerTestDB(t)
 			before := readControllerInventoryItems(t, db)
-			response := performControllerRequest(http.MethodPost, "/game/add_inventory_item", "/game/add_inventory_item", test.body, AddInventoryItem)
+			response := performPlayerRequest(t, 1, http.MethodPost, "/game/add_inventory_item", "/game/add_inventory_item", test.body, AddInventoryItem)
 			assertControllerError(t, response, test.status, test.message)
 			if after := readControllerInventoryItems(t, db); !reflect.DeepEqual(after, before) {
 				t.Fatalf("inventory items changed on rejected request: before %v, after %v", before, after)
@@ -167,8 +168,8 @@ func TestAddInventoryItemReturnsWriteErrorsWithoutChangingInventory(t *testing.T
 				BEFORE %s ON player_inventory_items
 				BEGIN SELECT RAISE(ABORT, 'write rejected by test'); END`, test.operation))
 
-			body := fmt.Sprintf(`{"player_id":1,"inventory_id":10,"item_id":%d,"quantity":1}`, test.itemID)
-			response := performControllerRequest(http.MethodPost, "/game/add_inventory_item", "/game/add_inventory_item", body, AddInventoryItem)
+			body := fmt.Sprintf(`{"inventory_id":10,"item_id":%d,"quantity":1}`, test.itemID)
+			response := performPlayerRequest(t, 1, http.MethodPost, "/game/add_inventory_item", "/game/add_inventory_item", body, AddInventoryItem)
 			assertControllerError(t, response, http.StatusInternalServerError, test.message)
 			if after := readControllerInventoryItems(t, db); !reflect.DeepEqual(after, before) {
 				t.Fatalf("inventory items changed after a failed write: before %v, after %v", before, after)

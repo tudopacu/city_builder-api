@@ -1,6 +1,7 @@
 package controllers
 
 import (
+	"API/authentication"
 	"API/database"
 	redisClient "API/redis"
 	"context"
@@ -10,8 +11,10 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"reflect"
+	"strconv"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/redis/go-redis/v9"
@@ -63,6 +66,29 @@ func performControllerRequest(method, route, target, body string, handler gin.Ha
 	for _, cookie := range cookies {
 		request.AddCookie(cookie)
 	}
+	response := httptest.NewRecorder()
+	router.ServeHTTP(response, request)
+	return response
+}
+
+func useAuthenticationTestSecret(t *testing.T) {
+	t.Helper()
+	previous := authentication.JwtSecret
+	authentication.JwtSecret = []byte("controller-test-secret-0123456789abcdef")
+	t.Cleanup(func() { authentication.JwtSecret = previous })
+}
+
+// performPlayerRequest sends the request as playerID through the real
+// AuthMiddleware, because player-scoped handlers take the player from there.
+func performPlayerRequest(t *testing.T, playerID uint, method, route, target, body string, handler gin.HandlerFunc) *httptest.ResponseRecorder {
+	t.Helper()
+	useAuthenticationTestSecret(t)
+	cookie := authenticationTestCookie(t, strconv.FormatUint(uint64(playerID), 10), time.Now().Add(time.Hour), authentication.JwtSecret)
+	router := gin.New()
+	router.Handle(method, route, (&authentication.Server{}).AuthMiddleware(), handler)
+	request := httptest.NewRequest(method, target, strings.NewReader(body))
+	request.Header.Set("Content-Type", "application/json")
+	request.AddCookie(cookie)
 	response := httptest.NewRecorder()
 	router.ServeHTTP(response, request)
 	return response

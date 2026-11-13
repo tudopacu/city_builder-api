@@ -16,8 +16,9 @@ import (
 )
 
 func StartProduction(playerID, playerBuildingID, buildingProductionID uint) (int, *responses.StartProductionResponse, error) {
+	// Another player's building is reported as not found, the same as a missing one.
 	var playerBuilding models.PlayerBuilding
-	if err := database.DB.First(&playerBuilding, playerBuildingID).Error; err != nil {
+	if err := database.DB.Where("player_id = ?", playerID).First(&playerBuilding, playerBuildingID).Error; err != nil {
 		log.Default().Printf("player building not found, id %d: %s", playerBuildingID, err)
 		return http.StatusNotFound, nil, fmt.Errorf("player building not found")
 	}
@@ -73,6 +74,17 @@ func StartProduction(playerID, playerBuildingID, buildingProductionID uint) (int
 func CollectProduction(playerID, playerBuildingID, buildingProductionID uint) (int, error) {
 	statusCode := http.StatusInternalServerError
 	err := database.DB.Transaction(func(tx *gorm.DB) error {
+		// Only the building's owner may collect. This also covers productions that
+		// were started in another player's building before StartProduction checked it.
+		var playerBuilding models.PlayerBuilding
+		if err := tx.Select("id").Where("player_id = ?", playerID).First(&playerBuilding, playerBuildingID).Error; err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				statusCode = http.StatusNotFound
+				return fmt.Errorf("production not found")
+			}
+			return fmt.Errorf("failed to load player building: %w", err)
+		}
+
 		// Lock the production so concurrent collection requests cannot award it twice.
 		var entry models.PlayerBuildingProduction
 		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).

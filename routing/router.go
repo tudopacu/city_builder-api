@@ -29,21 +29,23 @@ func InitRouter() {
 
 	game := r.Group("/game").Use(s.AuthMiddleware())
 
+	// Player-scoped routes act on the player in the auth token, never on an ID
+	// from the URL or body.
 	game.GET("/get_player", controllers.GetPlayer)
-	game.GET("/get_player_buildings/:player_id/:map_id", controllers.GetPlayerBuildings)
-	game.GET("/get_player_inventories/:player_id/:map_id", controllers.GetPlayerInventories)
-	game.GET("/get_player_population/:player_id/:map_id", controllers.GetPlayerPopulation)
+	game.GET("/get_player_buildings/:map_id", controllers.GetPlayerBuildings)
+	game.GET("/get_player_inventories/:map_id", controllers.GetPlayerInventories)
+	game.GET("/get_player_population/:map_id", controllers.GetPlayerPopulation)
 	game.POST("/add_building", controllers.AddPlayerBuilding)
 	game.DELETE("/remove_player_building/:player_building_id", controllers.DeletePlayerBuilding)
 	game.POST("/add_inventory_item", controllers.AddInventoryItem)
-	game.POST("/start_production/:player_id/:player_building_id/:building_production_id", controllers.StartBuildingProduction)
-	game.PUT("/collect_production/:player_id/:player_building_id/:building_production_id", controllers.CollectBuildingProduction)
+	game.POST("/start_production/:player_building_id/:building_production_id", controllers.StartBuildingProduction)
+	game.PUT("/collect_production/:player_building_id/:building_production_id", controllers.CollectBuildingProduction)
 
 	game.GET("/map/:id", controllers.GetMap)
 	game.GET("/tiles", controllers.GetTiles)
 	game.GET("/buildings", controllers.GetBuildings)
 	game.GET("/items", controllers.GetItems)
-	game.GET("/roads/:player_id/:map_id", controllers.GetRoads)
+	game.GET("/roads/:map_id", controllers.GetRoads)
 	game.GET("/current_timestamp", controllers.GetCurrentTimestamp)
 
 	r.POST("/register", controllers.HandleRegister)

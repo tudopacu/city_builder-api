@@ -55,8 +55,8 @@ func TestGetPlayerBuildingsReturnsScopedBuildingsAndProduction(t *testing.T) {
 			(300, 2, 30, 50, '2020-01-01 00:00:00', 'PENDING'),
 			(400, 1, 40, 50, '2020-01-01 00:00:00', 'PENDING')`,
 	)
-	response := performControllerRequest(http.MethodGet, "/game/get_player_buildings/:player_id/:map_id",
-		"/game/get_player_buildings/1/9", "", GetPlayerBuildings)
+	response := performPlayerRequest(t, 1, http.MethodGet, "/game/get_player_buildings/:map_id",
+		"/game/get_player_buildings/9", "", GetPlayerBuildings)
 	assertControllerJSON(t, response, http.StatusOK, `{"player_buildings":[
 		{"id":10,"building":{"id":30,"name":"Sawmill","description":"","width":1,"length":1,"building_category":"Production"},
 		"level":1,"x":2,"y":3,"building_current_production":{"id":100,"end_time":"2020-01-01T00:00:00Z","status":"DONE","building_production_id":50,"item_name":"Wood","quantity":5}},
@@ -79,34 +79,26 @@ func TestGetPlayerBuildingsReturnsScopedBuildingsAndProduction(t *testing.T) {
 
 func TestGetPlayerBuildingsReturnsEmptyArray(t *testing.T) {
 	newBuildingControllersDB(t)
-	response := performControllerRequest(http.MethodGet, "/game/get_player_buildings/:player_id/:map_id",
-		"/game/get_player_buildings/1/9", "", GetPlayerBuildings)
+	response := performPlayerRequest(t, 1, http.MethodGet, "/game/get_player_buildings/:map_id",
+		"/game/get_player_buildings/9", "", GetPlayerBuildings)
 	assertControllerJSON(t, response, http.StatusOK, `{"player_buildings":[]}`)
 }
 
-func TestGetPlayerBuildingsRejectsInvalidIDs(t *testing.T) {
-	for _, parameter := range []string{"player_id", "map_id"} {
-		for _, value := range []string{"abc", "-1", "1.5", "4294967296"} {
-			t.Run(parameter+"/"+value, func(t *testing.T) {
-				ids := []string{"1", "9"}
-				if parameter == "player_id" {
-					ids[0] = value
-				} else {
-					ids[1] = value
-				}
-				response := performControllerRequest(http.MethodGet, "/game/get_player_buildings/:player_id/:map_id",
-					"/game/get_player_buildings/"+strings.Join(ids, "/"), "", GetPlayerBuildings)
-				assertControllerError(t, response, http.StatusBadRequest, "invalid "+parameter)
-			})
-		}
+func TestGetPlayerBuildingsRejectsInvalidMapID(t *testing.T) {
+	for _, value := range []string{"abc", "-1", "1.5", "4294967296"} {
+		t.Run(value, func(t *testing.T) {
+			response := performPlayerRequest(t, 1, http.MethodGet, "/game/get_player_buildings/:map_id",
+				"/game/get_player_buildings/"+value, "", GetPlayerBuildings)
+			assertControllerError(t, response, http.StatusBadRequest, "invalid map_id")
+		})
 	}
 }
 
 func TestGetPlayerBuildingsReturnsDatabaseError(t *testing.T) {
 	db := newBuildingControllersDB(t)
 	execControllerSQL(t, db, "DROP TABLE player_building_productions")
-	response := performControllerRequest(http.MethodGet, "/game/get_player_buildings/:player_id/:map_id",
-		"/game/get_player_buildings/1/9", "", GetPlayerBuildings)
+	response := performPlayerRequest(t, 1, http.MethodGet, "/game/get_player_buildings/:map_id",
+		"/game/get_player_buildings/9", "", GetPlayerBuildings)
 	if response.Code != http.StatusInternalServerError {
 		t.Fatalf("status = %d, body = %s", response.Code, response.Body.String())
 	}
@@ -119,27 +111,26 @@ func TestGetPlayerBuildingsReturnsDatabaseError(t *testing.T) {
 	}
 }
 
-const addBuildingControllerBody = `{"player_id":1,"building_id":30,"map_id":9,"x":2,"y":3}`
+const addBuildingControllerBody = `{"building_id":30,"map_id":9,"x":2,"y":3}`
 
 func TestAddPlayerBuildingRejectsInvalidRequest(t *testing.T) {
 	for _, body := range []string{
-		``, `{`, `[]`, `{}`, `{"player_id":"1","building_id":30,"map_id":9,"x":2,"y":3}`,
-		`{"player_id":-1,"building_id":30,"map_id":9,"x":2,"y":3}`,
-		`{"building_id":30,"map_id":9,"x":2,"y":3}`,
-		`{"player_id":1,"map_id":9,"x":2,"y":3}`,
-		`{"player_id":1,"building_id":30,"x":2,"y":3}`,
-		`{"player_id":1,"building_id":30,"map_id":9,"y":3}`,
-		`{"player_id":1,"building_id":30,"map_id":9,"x":2}`,
+		``, `{`, `[]`, `{}`, `{"building_id":"30","map_id":9,"x":2,"y":3}`,
+		`{"building_id":-1,"map_id":9,"x":2,"y":3}`,
+		`{"map_id":9,"x":2,"y":3}`,
+		`{"building_id":30,"x":2,"y":3}`,
+		`{"building_id":30,"map_id":9,"y":3}`,
+		`{"building_id":30,"map_id":9,"x":2}`,
 	} {
 		t.Run(body, func(t *testing.T) {
-			response := performControllerRequest(http.MethodPost, "/game/add_building", "/game/add_building", body, AddPlayerBuilding)
+			response := performPlayerRequest(t, 1, http.MethodPost, "/game/add_building", "/game/add_building", body, AddPlayerBuilding)
 			assertControllerError(t, response, http.StatusBadRequest, "invalid request")
 		})
 	}
 	for _, coordinate := range []string{"x", "y"} {
 		t.Run("negative "+coordinate, func(t *testing.T) {
 			body := strings.Replace(addBuildingControllerBody, `"`+coordinate+`":`+map[string]string{"x": "2", "y": "3"}[coordinate], `"`+coordinate+`":-1`, 1)
-			response := performControllerRequest(http.MethodPost, "/game/add_building", "/game/add_building", body, AddPlayerBuilding)
+			response := performPlayerRequest(t, 1, http.MethodPost, "/game/add_building", "/game/add_building", body, AddPlayerBuilding)
 			assertControllerError(t, response, http.StatusBadRequest, "coordinates must be non-negative")
 		})
 	}
@@ -157,7 +148,7 @@ func TestAddPlayerBuildingCreatesBuildingAndConsumesItems(t *testing.T) {
 				`INSERT INTO player_inventories (id, player_id, map_id, capacity) VALUES (10, 1, 9, 100)`,
 				`INSERT INTO player_inventory_items (id, player_inventory_id, item_id, quantity) VALUES (1, 10, 7, 8)`,
 			)
-			response := performControllerRequest(http.MethodPost, "/game/add_building", "/game/add_building", addBuildingControllerBody, AddPlayerBuilding)
+			response := performPlayerRequest(t, 1, http.MethodPost, "/game/add_building", "/game/add_building", addBuildingControllerBody, AddPlayerBuilding)
 			assertControllerJSON(t, response, http.StatusCreated, fmt.Sprintf(`{"player_building":{"id":1,
 				"building":{"id":30,"name":"Sawmill","description":"","width":1,"length":1,"building_category":%q},
 				"level":1,"x":2,"y":3,"building_current_production":null}}`, category))
@@ -210,7 +201,7 @@ func TestAddPlayerBuildingReturnsServiceErrors(t *testing.T) {
 			if err := db.Model(&models.PlayerBuilding{}).Count(&before).Error; err != nil {
 				t.Fatal(err)
 			}
-			response := performControllerRequest(http.MethodPost, "/game/add_building", "/game/add_building", addBuildingControllerBody, AddPlayerBuilding)
+			response := performPlayerRequest(t, 1, http.MethodPost, "/game/add_building", "/game/add_building", addBuildingControllerBody, AddPlayerBuilding)
 			assertControllerError(t, response, tc.status, tc.message)
 			var after int64
 			if err := db.Model(&models.PlayerBuilding{}).Count(&after).Error; err != nil {
@@ -223,6 +214,35 @@ func TestAddPlayerBuildingReturnsServiceErrors(t *testing.T) {
 	}
 }
 
+// A player_id in the body used to decide whose building it was and whose items paid for it.
+func TestAddPlayerBuildingIgnoresPlayerIDInBody(t *testing.T) {
+	db := newBuildingControllersDB(t)
+	execControllerSQL(t, db,
+		`INSERT INTO building_construction_costs (building_id, item_id, quantity) VALUES (30, 7, 3)`,
+		`INSERT INTO player_inventories (id, player_id, map_id, capacity) VALUES (10, 1, 9, 100), (20, 2, 9, 100)`,
+		`INSERT INTO player_inventory_items (id, player_inventory_id, item_id, quantity) VALUES (1, 10, 7, 8), (2, 20, 7, 8)`,
+	)
+	response := performPlayerRequest(t, 1, http.MethodPost, "/game/add_building", "/game/add_building",
+		`{"player_id":2,"building_id":30,"map_id":9,"x":2,"y":3}`, AddPlayerBuilding)
+	if response.Code != http.StatusCreated {
+		t.Fatalf("status = %d, body = %s", response.Code, response.Body.String())
+	}
+	var building models.PlayerBuilding
+	if err := db.First(&building, 1).Error; err != nil {
+		t.Fatal(err)
+	}
+	if building.PlayerID != 1 {
+		t.Fatalf("building belongs to player %d, want the authenticated player 1", building.PlayerID)
+	}
+	var items []models.PlayerInventoryItem
+	if err := db.Order("id").Find(&items).Error; err != nil {
+		t.Fatal(err)
+	}
+	if len(items) != 2 || items[0].Quantity != 5 || items[1].Quantity != 8 {
+		t.Fatalf("stock = %+v, want player 1 to pay 3 and player 2 to keep 8", items)
+	}
+}
+
 func TestDeletePlayerBuildingDeletesStorageAndContents(t *testing.T) {
 	db := newBuildingControllersDB(t)
 	execControllerSQL(t, db,
@@ -232,7 +252,7 @@ func TestDeletePlayerBuildingDeletesStorageAndContents(t *testing.T) {
 		`INSERT INTO player_inventories (id, player_id, player_building_id, capacity) VALUES (1, 1, 10, 25), (2, 1, 20, 25)`,
 		`INSERT INTO player_inventory_items (id, player_inventory_id, item_id, quantity) VALUES (1, 1, 7, 3), (2, 2, 7, 4)`,
 	)
-	response := performControllerRequest(http.MethodDelete, "/game/remove_player_building/:player_building_id",
+	response := performPlayerRequest(t, 1, http.MethodDelete, "/game/remove_player_building/:player_building_id",
 		"/game/remove_player_building/10", "", DeletePlayerBuilding)
 	assertControllerJSON(t, response, http.StatusOK, `{"message":"player building deleted successfully"}`)
 	for _, check := range []struct {
@@ -249,6 +269,23 @@ func TestDeletePlayerBuildingDeletesStorageAndContents(t *testing.T) {
 	}
 }
 
+func TestDeletePlayerBuildingRejectsAnotherPlayersBuilding(t *testing.T) {
+	db := newBuildingControllersDB(t)
+	execControllerSQL(t, db,
+		`INSERT INTO player_buildings (id, player_id, building_id, map_id, building_level_id, x, y) VALUES (10, 1, 30, 9, 31, 2, 3)`,
+	)
+	response := performPlayerRequest(t, 2, http.MethodDelete, "/game/remove_player_building/:player_building_id",
+		"/game/remove_player_building/10", "", DeletePlayerBuilding)
+	assertControllerError(t, response, http.StatusNotFound, "player building not found")
+	var remaining int64
+	if err := db.Model(&models.PlayerBuilding{}).Count(&remaining).Error; err != nil {
+		t.Fatal(err)
+	}
+	if remaining != 1 {
+		t.Fatalf("player buildings = %d, want player 1's building to remain", remaining)
+	}
+}
+
 func TestGetPlayerPopulationReturnsTotalsForPlayerAndMap(t *testing.T) {
 	db := newBuildingControllersDB(t)
 	execControllerSQL(t, db,
@@ -260,23 +297,16 @@ func TestGetPlayerPopulationReturnsTotalsForPlayerAndMap(t *testing.T) {
 			(10, 1, 40, 9, 41, 2, 3), (20, 1, 30, 9, 42, 4, 5), (30, 1, 30, 8, 42, 6, 7), (40, 2, 40, 9, 41, 8, 9)`,
 	)
 
-	response := performControllerRequest(http.MethodGet, "/game/get_player_population/:player_id/:map_id",
-		"/game/get_player_population/1/9", "", GetPlayerPopulation)
+	response := performPlayerRequest(t, 1, http.MethodGet, "/game/get_player_population/:map_id",
+		"/game/get_player_population/9", "", GetPlayerPopulation)
 
 	assertControllerJSON(t, response, http.StatusOK, `{"population":{"total":10,"used":3,"available":7}}`)
 }
 
-func TestGetPlayerPopulationRejectsInvalidIDs(t *testing.T) {
-	for _, tc := range []struct{ name, target, message string }{
-		{"player", "/game/get_player_population/abc/9", "invalid player_id"},
-		{"map", "/game/get_player_population/1/abc", "invalid map_id"},
-	} {
-		t.Run(tc.name, func(t *testing.T) {
-			response := performControllerRequest(http.MethodGet, "/game/get_player_population/:player_id/:map_id",
-				tc.target, "", GetPlayerPopulation)
-			assertControllerError(t, response, http.StatusBadRequest, tc.message)
-		})
-	}
+func TestGetPlayerPopulationRejectsInvalidMapID(t *testing.T) {
+	response := performPlayerRequest(t, 1, http.MethodGet, "/game/get_player_population/:map_id",
+		"/game/get_player_population/abc", "", GetPlayerPopulation)
+	assertControllerError(t, response, http.StatusBadRequest, "invalid map_id")
 }
 
 func TestDeletePlayerBuildingRejectsHousingStillInUse(t *testing.T) {
@@ -289,7 +319,7 @@ func TestDeletePlayerBuildingRejectsHousingStillInUse(t *testing.T) {
 			(10, 1, 40, 9, 41, 2, 3), (20, 1, 30, 9, 31, 4, 5)`,
 	)
 
-	response := performControllerRequest(http.MethodDelete, "/game/remove_player_building/:player_building_id",
+	response := performPlayerRequest(t, 1, http.MethodDelete, "/game/remove_player_building/:player_building_id",
 		"/game/remove_player_building/10", "", DeletePlayerBuilding)
 
 	assertControllerError(t, response, http.StatusConflict,
@@ -306,7 +336,7 @@ func TestDeletePlayerBuildingRejectsHousingStillInUse(t *testing.T) {
 func TestDeletePlayerBuildingRejectsInvalidID(t *testing.T) {
 	for _, id := range []string{"abc", "-1", "1.5", "4294967296"} {
 		t.Run(id, func(t *testing.T) {
-			response := performControllerRequest(http.MethodDelete, "/game/remove_player_building/:player_building_id",
+			response := performPlayerRequest(t, 1, http.MethodDelete, "/game/remove_player_building/:player_building_id",
 				"/game/remove_player_building/"+id, "", DeletePlayerBuilding)
 			assertControllerError(t, response, http.StatusBadRequest, "invalid player_building_id")
 		})
@@ -326,7 +356,7 @@ func TestDeletePlayerBuildingReturnsServiceErrors(t *testing.T) {
 			if tc.setup != "" {
 				execControllerSQL(t, db, tc.setup)
 			}
-			response := performControllerRequest(http.MethodDelete, "/game/remove_player_building/:player_building_id",
+			response := performPlayerRequest(t, 1, http.MethodDelete, "/game/remove_player_building/:player_building_id",
 				"/game/remove_player_building/10", "", DeletePlayerBuilding)
 			assertControllerError(t, response, tc.status, tc.message)
 		})

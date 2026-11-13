@@ -8,7 +8,6 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/gin-gonic/gin"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
@@ -52,16 +51,14 @@ func newPlayerInventoriesTestDB(t *testing.T) *gorm.DB {
 	return db
 }
 
-func requestPlayerInventories(playerID, mapID string) *httptest.ResponseRecorder {
-	router := gin.New()
-	router.GET("/game/get_player_inventories/:player_id/:map_id", GetPlayerInventories)
-	response := httptest.NewRecorder()
-	path := "/game/get_player_inventories/" + playerID
+// requestPlayerInventories asks for player 1's inventories on mapID.
+func requestPlayerInventories(t *testing.T, mapID string) *httptest.ResponseRecorder {
+	t.Helper()
+	path := "/game/get_player_inventories"
 	if mapID != "" {
 		path += "/" + mapID
 	}
-	router.ServeHTTP(response, httptest.NewRequest(http.MethodGet, path, nil))
-	return response
+	return performPlayerRequest(t, 1, http.MethodGet, "/game/get_player_inventories/:map_id", path, "", GetPlayerInventories)
 }
 
 func TestGetPlayerInventoriesReturnsContentsAndTotalsForPlayerAndMap(t *testing.T) {
@@ -79,7 +76,7 @@ func TestGetPlayerInventoriesReturnsContentsAndTotalsForPlayerAndMap(t *testing.
 		}
 	}
 
-	response := requestPlayerInventories("1", "9")
+	response := requestPlayerInventories(t, "9")
 	if response.Code != http.StatusOK {
 		t.Fatalf("status = %d, body = %s", response.Code, response.Body.String())
 	}
@@ -137,7 +134,7 @@ func TestGetPlayerInventoriesReturnsEmptyArray(t *testing.T) {
 		VALUES (10, 1, 10, 100)`).Error; err != nil {
 		t.Fatal(err)
 	}
-	response := requestPlayerInventories("1", "9")
+	response := requestPlayerInventories(t, "9")
 	if response.Code != http.StatusOK {
 		t.Fatalf("status = %d, body = %s", response.Code, response.Body.String())
 	}
@@ -155,26 +152,8 @@ func TestGetPlayerInventoriesReturnsEmptyArray(t *testing.T) {
 	}
 }
 
-func TestGetPlayerInventoriesRejectsInvalidPlayerID(t *testing.T) {
-	for _, playerID := range []string{"abc", "-1", "1.5", "4294967296"} {
-		t.Run(playerID, func(t *testing.T) {
-			response := requestPlayerInventories(playerID, "9")
-			if response.Code != http.StatusBadRequest {
-				t.Fatalf("status = %d, want 400; body = %s", response.Code, response.Body.String())
-			}
-			var payload map[string]string
-			if err := json.Unmarshal(response.Body.Bytes(), &payload); err != nil {
-				t.Fatal(err)
-			}
-			if payload["error"] != "invalid player_id" {
-				t.Fatalf("error = %q, want invalid player_id", payload["error"])
-			}
-		})
-	}
-}
-
 func TestGetPlayerInventoriesRejectsMissingMapID(t *testing.T) {
-	response := requestPlayerInventories("1", "")
+	response := requestPlayerInventories(t, "")
 	if response.Code != http.StatusNotFound {
 		t.Fatalf("status = %d, want 404; body = %s", response.Code, response.Body.String())
 	}
@@ -183,7 +162,7 @@ func TestGetPlayerInventoriesRejectsMissingMapID(t *testing.T) {
 func TestGetPlayerInventoriesRejectsInvalidMapID(t *testing.T) {
 	for _, mapID := range []string{"abc", "-1", "1.5", "4294967296"} {
 		t.Run(mapID, func(t *testing.T) {
-			response := requestPlayerInventories("1", mapID)
+			response := requestPlayerInventories(t, mapID)
 			if response.Code != http.StatusBadRequest {
 				t.Fatalf("status = %d, want 400; body = %s", response.Code, response.Body.String())
 			}
@@ -203,7 +182,7 @@ func TestGetPlayerInventoriesReturnsDatabaseError(t *testing.T) {
 	if err := db.Exec("DROP TABLE player_inventories").Error; err != nil {
 		t.Fatal(err)
 	}
-	response := requestPlayerInventories("1", "9")
+	response := requestPlayerInventories(t, "9")
 	if response.Code != http.StatusInternalServerError {
 		t.Fatalf("status = %d, want 500; body = %s", response.Code, response.Body.String())
 	}

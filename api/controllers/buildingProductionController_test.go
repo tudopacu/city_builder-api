@@ -34,12 +34,12 @@ func TestBuildingProductionControllersRejectInvalidIDs(t *testing.T) {
 		{"start", http.MethodPost, "/game/start_production", StartBuildingProduction},
 		{"collect", http.MethodPut, "/game/collect_production", CollectBuildingProduction},
 	} {
-		for index, parameter := range []string{"player_id", "player_building_id", "building_production_id"} {
+		for index, parameter := range []string{"player_building_id", "building_production_id"} {
 			for _, value := range []string{"abc", "-1", "1.5", "4294967296"} {
 				t.Run(endpoint.name+"/"+parameter+"/"+value, func(t *testing.T) {
-					ids := []string{"1", "10", "50"}
+					ids := []string{"10", "50"}
 					ids[index] = value
-					response := performControllerRequest(endpoint.method, endpoint.path+"/:player_id/:player_building_id/:building_production_id",
+					response := performPlayerRequest(t, 1, endpoint.method, endpoint.path+"/:player_building_id/:building_production_id",
 						endpoint.path+"/"+strings.Join(ids, "/"), "", endpoint.handler)
 					assertControllerError(t, response, http.StatusBadRequest, "invalid "+parameter)
 				})
@@ -51,8 +51,8 @@ func TestBuildingProductionControllersRejectInvalidIDs(t *testing.T) {
 func TestStartBuildingProductionCreatesPendingProduction(t *testing.T) {
 	db := newProductionControllerDB(t)
 	before := time.Now()
-	response := performControllerRequest(http.MethodPost, "/game/start_production/:player_id/:player_building_id/:building_production_id",
-		"/game/start_production/1/10/50", "", StartBuildingProduction)
+	response := performPlayerRequest(t, 1, http.MethodPost, "/game/start_production/:player_building_id/:building_production_id",
+		"/game/start_production/10/50", "", StartBuildingProduction)
 	after := time.Now()
 	if response.Code != http.StatusCreated {
 		t.Fatalf("status = %d, body = %s", response.Code, response.Body.String())
@@ -104,8 +104,8 @@ func TestStartBuildingProductionReturnsServiceErrors(t *testing.T) {
 			if err := db.Model(&models.PlayerBuildingProduction{}).Count(&before).Error; err != nil {
 				t.Fatal(err)
 			}
-			response := performControllerRequest(http.MethodPost, "/game/start_production/:player_id/:player_building_id/:building_production_id",
-				"/game/start_production/1/10/50", "", StartBuildingProduction)
+			response := performPlayerRequest(t, 1, http.MethodPost, "/game/start_production/:player_building_id/:building_production_id",
+				"/game/start_production/10/50", "", StartBuildingProduction)
 			assertControllerError(t, response, tc.status, tc.message)
 			var after int64
 			if err := db.Model(&models.PlayerBuildingProduction{}).Count(&after).Error; err != nil {
@@ -133,8 +133,8 @@ func TestCollectBuildingProductionStoresOutputOnce(t *testing.T) {
 				`INSERT INTO player_inventories (id, player_id, map_id, capacity) VALUES (10, 1, 9, 10)`,
 				`INSERT INTO player_inventory_items (id, player_inventory_id, item_id, quantity) VALUES (1, 10, 7, 3)`,
 			)
-			response := performControllerRequest(http.MethodPut, "/game/collect_production/:player_id/:player_building_id/:building_production_id",
-				"/game/collect_production/1/10/50", "", CollectBuildingProduction)
+			response := performPlayerRequest(t, 1, http.MethodPut, "/game/collect_production/:player_building_id/:building_production_id",
+				"/game/collect_production/10/50", "", CollectBuildingProduction)
 			assertControllerJSON(t, response, http.StatusOK, `{"message":"production collected successfully"}`)
 			if err := db.First(&entry, 100).Error; err != nil {
 				t.Fatal(err)
@@ -149,8 +149,8 @@ func TestCollectBuildingProductionStoresOutputOnce(t *testing.T) {
 			if item.Quantity != 8 {
 				t.Fatalf("stored quantity = %d, want 8", item.Quantity)
 			}
-			response = performControllerRequest(http.MethodPut, "/game/collect_production/:player_id/:player_building_id/:building_production_id",
-				"/game/collect_production/1/10/50", "", CollectBuildingProduction)
+			response = performPlayerRequest(t, 1, http.MethodPut, "/game/collect_production/:player_building_id/:building_production_id",
+				"/game/collect_production/10/50", "", CollectBuildingProduction)
 			assertControllerError(t, response, http.StatusNotFound, "production not found")
 			if err := db.First(&item, 1).Error; err != nil {
 				t.Fatal(err)
@@ -165,17 +165,18 @@ func TestCollectBuildingProductionStoresOutputOnce(t *testing.T) {
 func TestCollectBuildingProductionReturnsServiceErrors(t *testing.T) {
 	for _, tc := range []struct {
 		name, setup, ids, message string
+		playerID                  uint
 		status                    int
 	}{
-		{"missing production", "DELETE FROM player_building_productions", "1/10/50", "production not found", http.StatusNotFound},
-		{"wrong player", "", "2/10/50", "production not found", http.StatusNotFound},
-		{"wrong player building", "", "1/20/50", "production not found", http.StatusNotFound},
-		{"wrong recipe", "", "1/10/60", "production not found", http.StatusNotFound},
-		{"unfinished", "UPDATE player_building_productions SET end_time = '2999-01-01 00:00:00'", "1/10/50", "production is not finished yet", http.StatusBadRequest},
-		{"insufficient capacity", "UPDATE player_inventories SET capacity = 4", "1/10/50", "not enough capacity: available 4, requested 5", http.StatusBadRequest},
-		{"database error", "DROP TABLE player_building_productions", "1/10/50", "failed to collect production", http.StatusInternalServerError},
+		{"missing production", "DELETE FROM player_building_productions", "10/50", "production not found", 1, http.StatusNotFound},
+		{"wrong player", "", "10/50", "production not found", 2, http.StatusNotFound},
+		{"wrong player building", "", "20/50", "production not found", 1, http.StatusNotFound},
+		{"wrong recipe", "", "10/60", "production not found", 1, http.StatusNotFound},
+		{"unfinished", "UPDATE player_building_productions SET end_time = '2999-01-01 00:00:00'", "10/50", "production is not finished yet", 1, http.StatusBadRequest},
+		{"insufficient capacity", "UPDATE player_inventories SET capacity = 4", "10/50", "not enough capacity: available 4, requested 5", 1, http.StatusBadRequest},
+		{"database error", "DROP TABLE player_building_productions", "10/50", "failed to collect production", 1, http.StatusInternalServerError},
 		{"write failure", `CREATE TRIGGER reject_collection BEFORE UPDATE OF status ON player_building_productions
-			BEGIN SELECT RAISE(ABORT, 'status update failed'); END`, "1/10/50", "failed to collect production", http.StatusInternalServerError},
+			BEGIN SELECT RAISE(ABORT, 'status update failed'); END`, "10/50", "failed to collect production", 1, http.StatusInternalServerError},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			db := newProductionControllerDB(t)
@@ -187,7 +188,7 @@ func TestCollectBuildingProductionReturnsServiceErrors(t *testing.T) {
 			if tc.setup != "" {
 				execControllerSQL(t, db, tc.setup)
 			}
-			response := performControllerRequest(http.MethodPut, "/game/collect_production/:player_id/:player_building_id/:building_production_id",
+			response := performPlayerRequest(t, tc.playerID, http.MethodPut, "/game/collect_production/:player_building_id/:building_production_id",
 				"/game/collect_production/"+tc.ids, "", CollectBuildingProduction)
 			assertControllerError(t, response, tc.status, tc.message)
 			var itemCount int64
@@ -198,5 +199,35 @@ func TestCollectBuildingProductionReturnsServiceErrors(t *testing.T) {
 				t.Fatalf("failed collection left %d inventory items", itemCount)
 			}
 		})
+	}
+}
+
+// Player 2 used to be able to run production in player 1's building under their
+// own player ID, then collect the output into their own storage.
+func TestPlayerCannotProduceInAnotherPlayersBuilding(t *testing.T) {
+	db := newProductionControllerDB(t) // building 10 belongs to player 1
+	execControllerSQL(t, db,
+		`INSERT INTO player_inventories (id, player_id, map_id, capacity) VALUES (77, 2, 9, 25)`,
+	)
+
+	response := performPlayerRequest(t, 2, http.MethodPost, "/game/start_production/:player_building_id/:building_production_id",
+		"/game/start_production/10/50", "", StartBuildingProduction)
+	assertControllerError(t, response, http.StatusNotFound, "player building not found")
+
+	// A production the old code already recorded that way pays nothing out either.
+	execControllerSQL(t, db,
+		`INSERT INTO player_building_productions (id, player_id, player_building_id, building_production_id, end_time, status)
+			VALUES (100, 2, 10, 50, '2020-01-01 00:00:00', 'DONE')`,
+	)
+	response = performPlayerRequest(t, 2, http.MethodPut, "/game/collect_production/:player_building_id/:building_production_id",
+		"/game/collect_production/10/50", "", CollectBuildingProduction)
+	assertControllerError(t, response, http.StatusNotFound, "production not found")
+
+	var itemCount int64
+	if err := db.Model(&models.PlayerInventoryItem{}).Count(&itemCount).Error; err != nil {
+		t.Fatal(err)
+	}
+	if itemCount != 0 {
+		t.Fatalf("player 2 received %d inventory items from player 1's building", itemCount)
 	}
 }

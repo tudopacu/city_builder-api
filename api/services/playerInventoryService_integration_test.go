@@ -148,8 +148,8 @@ func TestAddInventoryItemCreatesOrIncrementsEntryUpToCapacity(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			db := newPlayerInventoryServiceTestDB(t)
-			status, response := AddInventoryItem(requests.AddInventoryItemRequest{
-				PlayerID: 1, InventoryID: 10, ItemID: tc.itemID, Quantity: 11,
+			status, response := AddInventoryItem(1, requests.AddInventoryItemRequest{
+				InventoryID: 10, ItemID: tc.itemID, Quantity: 11,
 			})
 			if status != http.StatusOK || response.Error != "" || response.PlayerInventory == nil {
 				t.Fatalf("AddInventoryItem = (%d, %+v)", status, response)
@@ -183,21 +183,22 @@ func TestAddInventoryItemCreatesOrIncrementsEntryUpToCapacity(t *testing.T) {
 
 func TestAddInventoryItemRejectsMissingOwnershipAndCapacityViolationsWithoutWrites(t *testing.T) {
 	for _, tc := range []struct {
-		name    string
-		request requests.AddInventoryItemRequest
-		status  int
-		error   string
+		name     string
+		playerID uint
+		request  requests.AddInventoryItemRequest
+		status   int
+		error    string
 	}{
-		{"missing inventory", requests.AddInventoryItemRequest{PlayerID: 1, InventoryID: 99, ItemID: 7, Quantity: 1}, http.StatusNotFound, "inventory not found"},
-		{"wrong owner", requests.AddInventoryItemRequest{PlayerID: 2, InventoryID: 10, ItemID: 7, Quantity: 1}, http.StatusForbidden, "inventory does not belong to player"},
-		{"missing item", requests.AddInventoryItemRequest{PlayerID: 1, InventoryID: 10, ItemID: 99, Quantity: 1}, http.StatusNotFound, "item not found"},
-		{"existing item over capacity", requests.AddInventoryItemRequest{PlayerID: 1, InventoryID: 10, ItemID: 7, Quantity: 12}, http.StatusBadRequest, "not enough capacity: available 11, requested 12"},
-		{"new item over capacity", requests.AddInventoryItemRequest{PlayerID: 1, InventoryID: 10, ItemID: 9, Quantity: 12}, http.StatusBadRequest, "not enough capacity: available 11, requested 12"},
+		{"missing inventory", 1, requests.AddInventoryItemRequest{InventoryID: 99, ItemID: 7, Quantity: 1}, http.StatusNotFound, "inventory not found"},
+		{"wrong owner", 2, requests.AddInventoryItemRequest{InventoryID: 10, ItemID: 7, Quantity: 1}, http.StatusForbidden, "inventory does not belong to player"},
+		{"missing item", 1, requests.AddInventoryItemRequest{InventoryID: 10, ItemID: 99, Quantity: 1}, http.StatusNotFound, "item not found"},
+		{"existing item over capacity", 1, requests.AddInventoryItemRequest{InventoryID: 10, ItemID: 7, Quantity: 12}, http.StatusBadRequest, "not enough capacity: available 11, requested 12"},
+		{"new item over capacity", 1, requests.AddInventoryItemRequest{InventoryID: 10, ItemID: 9, Quantity: 12}, http.StatusBadRequest, "not enough capacity: available 11, requested 12"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			db := newPlayerInventoryServiceTestDB(t)
 			before := readServiceInventoryItems(t, db)
-			status, response := AddInventoryItem(tc.request)
+			status, response := AddInventoryItem(tc.playerID, tc.request)
 			if status != tc.status || response.Error != tc.error || response.PlayerInventory != nil {
 				t.Fatalf("AddInventoryItem = (%d, %+v), want (%d, %q)", status, response, tc.status, tc.error)
 			}
@@ -223,8 +224,8 @@ func TestAddInventoryItemReturnsWriteErrorsWithoutChangingEntries(t *testing.T) 
 			execServiceTestSQL(t, db, fmt.Sprintf(`CREATE TRIGGER reject_inventory_item_write
 				BEFORE %s ON player_inventory_items
 				BEGIN SELECT RAISE(ABORT, 'write rejected by test'); END`, tc.operation))
-			status, response := AddInventoryItem(requests.AddInventoryItemRequest{
-				PlayerID: 1, InventoryID: 10, ItemID: tc.itemID, Quantity: 1,
+			status, response := AddInventoryItem(1, requests.AddInventoryItemRequest{
+				InventoryID: 10, ItemID: tc.itemID, Quantity: 1,
 			})
 			if status != http.StatusInternalServerError || response.Error != tc.error || response.PlayerInventory != nil {
 				t.Fatalf("AddInventoryItem = (%d, %+v), want write failure %q", status, response, tc.error)
@@ -249,7 +250,7 @@ func TestAddInventoryItemReturnsReloadFailureWithoutSuccessPayload(t *testing.T)
 	}); err != nil {
 		t.Fatal(err)
 	}
-	status, response := AddInventoryItem(requests.AddInventoryItemRequest{PlayerID: 1, InventoryID: 10, ItemID: 9, Quantity: 1})
+	status, response := AddInventoryItem(1, requests.AddInventoryItemRequest{InventoryID: 10, ItemID: 9, Quantity: 1})
 	if status != http.StatusInternalServerError || response.Error != "failed to reload inventory" || response.PlayerInventory != nil {
 		t.Fatalf("AddInventoryItem = (%d, %+v), want reload failure", status, response)
 	}

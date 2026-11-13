@@ -11,9 +11,8 @@ import (
 )
 
 func GetPlayerInventories(c *gin.Context) {
-	playerID, err := strconv.ParseUint(c.Param("player_id"), 10, 32)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid player_id"})
+	playerID, ok := requirePlayerID(c)
+	if !ok {
 		return
 	}
 
@@ -23,7 +22,7 @@ func GetPlayerInventories(c *gin.Context) {
 		return
 	}
 
-	inventoryDTOs, totalQuantity, totalCapacity, err := services.GetPlayerInventories(uint(playerID), uint(mapID))
+	inventoryDTOs, totalQuantity, totalCapacity, err := services.GetPlayerInventories(playerID, uint(mapID))
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -33,6 +32,11 @@ func GetPlayerInventories(c *gin.Context) {
 }
 
 func AddInventoryItem(c *gin.Context) {
+	playerID, ok := requirePlayerID(c)
+	if !ok {
+		return
+	}
+
 	var request requests.AddInventoryItemRequest
 
 	if err := c.ShouldBindJSON(&request); err != nil {
@@ -40,6 +44,6 @@ func AddInventoryItem(c *gin.Context) {
 		return
 	}
 
-	statusCode, response := services.AddInventoryItem(request)
+	statusCode, response := services.AddInventoryItem(playerID, request)
 	c.JSON(statusCode, response)
 }

@@ -54,6 +54,10 @@ func newCollectionTestDB(t *testing.T) *gorm.DB {
 			id INTEGER PRIMARY KEY, player_inventory_id INTEGER, item_id INTEGER,
 			quantity INTEGER, created_at DATETIME, updated_at DATETIME,
 			UNIQUE (player_inventory_id, item_id))`,
+		// Only a building's owner may collect from it, so player 1 owns building 10.
+		`CREATE TABLE player_buildings (id INTEGER PRIMARY KEY, player_id INTEGER, building_id INTEGER, map_id INTEGER,
+			building_level_id INTEGER, x INTEGER, y INTEGER, created_at DATETIME, updated_at DATETIME)`,
+		`INSERT INTO player_buildings (id, player_id, building_id) VALUES (10, 1, 20)`,
 	} {
 		if err := db.Exec(statement).Error; err != nil {
 			t.Fatal(err)
@@ -194,6 +198,7 @@ func TestCollectProductionRejectsWithoutWrites(t *testing.T) {
 		status      string
 		unfinished  bool
 		wrongPlayer bool
+		otherOwner  bool
 		inventories []models.PlayerInventory
 		items       []models.PlayerInventoryItem
 		wantCode    int
@@ -216,6 +221,13 @@ func TestCollectProductionRejectsWithoutWrites(t *testing.T) {
 		{name: "unfinished", status: "PENDING", unfinished: true, wantCode: http.StatusBadRequest, wantError: "production is not finished yet"},
 		{name: "already collected", status: "COLLECTED", wantCode: http.StatusNotFound, wantError: "production not found"},
 		{name: "wrong player", status: "DONE", wrongPlayer: true, wantCode: http.StatusNotFound, wantError: "production not found"},
+		{
+			// A production recorded under player 1 for a building player 1 does not own,
+			// as StartProduction allowed before it checked ownership.
+			name: "production in another player's building", status: "DONE", otherOwner: true,
+			wantCode: http.StatusNotFound, wantError: "production not found",
+			inventories: []models.PlayerInventory{{ID: 1, PlayerID: 1, Capacity: 100}},
+		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			db := newCollectionTestDB(t)
@@ -224,6 +236,11 @@ func TestCollectProductionRejectsWithoutWrites(t *testing.T) {
 				endTime = time.Now().Add(time.Hour)
 			}
 			seedCollection(t, db, 5, tc.status, endTime, tc.inventories, tc.items)
+			if tc.otherOwner {
+				if err := db.Exec(`UPDATE player_buildings SET player_id = 2 WHERE id = 10`).Error; err != nil {
+					t.Fatal(err)
+				}
+			}
 			before := snapshotCollection(t, db)
 
 			// Any attempted write must fail with 500, so the expected 400/404

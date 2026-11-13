@@ -70,7 +70,7 @@ func newBuildingTestDB(t *testing.T) *gorm.DB {
 }
 
 func buildingTestRequest() requests.AddBuildingRequest {
-	return requests.AddBuildingRequest{PlayerID: 1, BuildingID: 30, MapID: 1, X: 2, Y: 3}
+	return requests.AddBuildingRequest{BuildingID: 30, MapID: 1, X: 2, Y: 3}
 }
 
 type buildingTestSnapshot struct {
@@ -99,7 +99,7 @@ func TestAddPlayerBuildingConsumesConstructionCostsAcrossInventories(t *testing.
 		`INSERT INTO player_inventory_items (id, player_inventory_id, item_id, quantity) VALUES
 			(1, 20, 7, 10), (2, 10, 7, 4), (3, 10, 8, 2), (4, 20, 8, 8), (5, 10, 9, 6), (6, 1, 7, 200)`,
 	)
-	status, response := AddPlayerBuilding(buildingTestRequest())
+	status, response := AddPlayerBuilding(1, buildingTestRequest())
 	if status != http.StatusCreated || response.Error != "" || response.PlayerBuilding == nil {
 		t.Fatalf("status = %d, response = %+v", status, response)
 	}
@@ -124,7 +124,7 @@ func TestAddPlayerBuildingConsumesConstructionCostsAcrossInventories(t *testing.
 
 func TestAddPlayerBuildingWithoutCostsNeedsNoInventories(t *testing.T) {
 	db := newBuildingTestDB(t)
-	status, response := AddPlayerBuilding(buildingTestRequest())
+	status, response := AddPlayerBuilding(1, buildingTestRequest())
 	if status != http.StatusCreated || response.Error != "" || response.PlayerBuilding == nil {
 		t.Fatalf("status = %d, response = %+v", status, response)
 	}
@@ -157,7 +157,7 @@ func TestAddPlayerBuildingRejectsInsufficientConstructionItemsWithoutWrites(t *t
 				`CREATE TRIGGER reject_placement BEFORE INSERT ON player_buildings BEGIN SELECT RAISE(ABORT, 'unexpected placement'); END`,
 			)
 			before := snapshotBuildingTest(t, db)
-			status, response := AddPlayerBuilding(buildingTestRequest())
+			status, response := AddPlayerBuilding(1, buildingTestRequest())
 			if status != http.StatusBadRequest || response.PlayerBuilding != nil {
 				t.Fatalf("status = %d, response = %+v", status, response)
 			}
@@ -200,7 +200,7 @@ func TestAddPlayerBuildingRollsBackOnFailure(t *testing.T) {
 				tc.setup,
 			)
 			before := snapshotBuildingTest(t, db)
-			status, response := AddPlayerBuilding(buildingTestRequest())
+			status, response := AddPlayerBuilding(1, buildingTestRequest())
 			if status != http.StatusInternalServerError || response.Error == "" || response.PlayerBuilding != nil {
 				t.Fatalf("status = %d, response = %+v", status, response)
 			}
@@ -233,7 +233,7 @@ func TestAddPlayerBuildingPreservesPlacementValidation(t *testing.T) {
 				tc.setup,
 			)
 			before := snapshotBuildingTest(t, db)
-			status, response := AddPlayerBuilding(buildingTestRequest())
+			status, response := AddPlayerBuilding(1, buildingTestRequest())
 			if status != http.StatusBadRequest || response.Error == "" || response.PlayerBuilding != nil {
 				t.Fatalf("status = %d, response = %+v", status, response)
 			}

@@ -2,6 +2,7 @@ package services
 
 import (
 	"API/api/dto"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -47,14 +48,14 @@ func TestGetNewsPaginatesNewestFirstAndCachesEachPageAndSize(t *testing.T) {
 		key        string
 		want       []dto.News
 	}{
-		{1, 2, "news:page:1:size:2", wantServiceNews(5, 4)},
-		{2, 2, "news:page:2:size:2", wantServiceNews(3, 2)},
-		{1, 3, "news:page:1:size:3", wantServiceNews(5, 4, 3)},
-		{3, 2, "news:page:3:size:2", wantServiceNews(1)},
+		{1, 2, "v2:news:page:1:size:2", wantServiceNews(5, 4)},
+		{2, 2, "v2:news:page:2:size:2", wantServiceNews(3, 2)},
+		{1, 3, "v2:news:page:1:size:3", wantServiceNews(5, 4, 3)},
+		{3, 2, "v2:news:page:3:size:2", wantServiceNews(1)},
 	}
 	for _, tc := range cases {
 		t.Run(tc.key, func(t *testing.T) {
-			got, count, err := GetNews(tc.page, tc.size)
+			got, count, err := GetNews(context.Background(), tc.page, tc.size)
 			if err != nil || count != 5 || !reflect.DeepEqual(got, tc.want) {
 				t.Fatalf("news = %+v, count = %d, error = %v; want %+v and total 5", got, count, err, tc.want)
 			}
@@ -73,7 +74,7 @@ func TestGetNewsPaginatesNewestFirstAndCachesEachPageAndSize(t *testing.T) {
 	// All pages must survive a database outage using their own cached content.
 	execServiceTestSQL(t, db, `DROP TABLE news`)
 	for _, tc := range cases {
-		got, count, err := GetNews(tc.page, tc.size)
+		got, count, err := GetNews(context.Background(), tc.page, tc.size)
 		if err != nil || count != 5 || !reflect.DeepEqual(got, tc.want) {
 			t.Fatalf("cached %s = %+v, count = %d, error = %v", tc.key, got, count, err)
 		}
@@ -94,7 +95,7 @@ func TestGetNewsHandlesEmptyPages(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			newServiceTestCache(t)
 			newNewsServiceTestDB(t, tc.rows)
-			news, count, err := GetNews(tc.page, 2)
+			news, count, err := GetNews(context.Background(), tc.page, 2)
 			if err != nil || len(news) != 0 || count != int64(tc.rows) {
 				t.Fatalf("news = %+v, count = %d, error = %v; want empty page, total %d", news, count, err, tc.rows)
 			}
@@ -107,7 +108,7 @@ func TestGetNewsFallsBackOnCacheProblems(t *testing.T) {
 		t.Run(failure, func(t *testing.T) {
 			cache := newServiceTestCache(t)
 			newNewsServiceTestDB(t, 3)
-			const key = "news:page:1:size:2"
+			const key = "v2:news:page:1:size:2"
 			switch failure {
 			case "corrupt entry":
 				cache.Set(key, `{invalid`)
@@ -116,7 +117,7 @@ func TestGetNewsFallsBackOnCacheProblems(t *testing.T) {
 			case "write failure":
 				cache.setErr = errors.New("cache write unavailable")
 			}
-			news, count, err := GetNews(1, 2)
+			news, count, err := GetNews(context.Background(), 1, 2)
 			if err != nil || count != 3 || !reflect.DeepEqual(news, wantServiceNews(3, 2)) {
 				t.Fatalf("news = %+v, count = %d, error = %v", news, count, err)
 			}
@@ -143,7 +144,7 @@ func TestGetNewsReturnsDatabaseFailuresWithoutCaching(t *testing.T) {
 			if tc.schema != "" {
 				execServiceTestSQL(t, db, tc.schema)
 			}
-			news, count, err := GetNews(1, 2)
+			news, count, err := GetNews(context.Background(), 1, 2)
 			if news != nil || count != 0 || err == nil || err.Error() != tc.want {
 				t.Fatalf("news = %+v, count = %d, error = %v; want nil, 0, %q", news, count, err, tc.want)
 			}

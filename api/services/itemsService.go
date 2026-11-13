@@ -4,9 +4,7 @@ import (
 	"API/api/dto"
 	"API/database"
 	"API/models"
-	redisClient "API/redis"
 	"context"
-	"encoding/json"
 	"fmt"
 	"log"
 	"time"
@@ -17,17 +15,11 @@ const (
 	itemsCacheTTL = 10 * time.Minute
 )
 
-func GetAllItems() ([]dto.Item, error) {
-	ctx := context.Background()
+func GetAllItems(ctx context.Context) ([]dto.Item, error) {
+	return cached(ctx, itemsCacheKey, itemsCacheTTL, loadItems)
+}
 
-	cached, err := redisClient.RDB.Get(ctx, itemsCacheKey).Result()
-	if err == nil {
-		var items []dto.Item
-		if jsonErr := json.Unmarshal([]byte(cached), &items); jsonErr == nil {
-			return items, nil
-		}
-	}
-
+func loadItems() ([]dto.Item, error) {
 	var items []models.Item
 	if err := database.DB.Order("id ASC").Find(&items).Error; err != nil {
 		log.Default().Println("failed to fetch items", err)
@@ -37,10 +29,6 @@ func GetAllItems() ([]dto.Item, error) {
 	itemDTOs := make([]dto.Item, 0, len(items))
 	for _, item := range items {
 		itemDTOs = append(itemDTOs, item.ToDTO())
-	}
-
-	if data, jsonErr := json.Marshal(itemDTOs); jsonErr == nil {
-		redisClient.RDB.Set(ctx, itemsCacheKey, data, itemsCacheTTL)
 	}
 
 	return itemDTOs, nil

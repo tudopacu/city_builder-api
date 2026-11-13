@@ -138,11 +138,11 @@ func TestMapControllersReturnCachedResponses(t *testing.T) {
 		name, key, value, route, target, want string
 		handler                               gin.HandlerFunc
 	}{
-		{"maps", "maps:all", `[{"id":9,"name":"Island","width":20,"length":30,"terrains":[]}]`,
+		{"maps", "v2:maps:all", `[{"id":9,"name":"Island","width":20,"length":30,"terrains":[]}]`,
 			"/maps", "/maps", `{"maps":[{"id":9,"name":"Island","width":20,"length":30,"terrains":[]}]}`, GetMaps},
-		{"map", "map:9", `{"id":9,"name":"Island","width":20,"length":30,"terrains":[]}`,
+		{"map", "v2:map:9", `{"id":9,"name":"Island","width":20,"length":30,"terrains":[]}`,
 			"/game/map/:id", "/game/map/9", `{"map":{"id":9,"name":"Island","width":20,"length":30,"terrains":[]}}`, GetMap},
-		{"tiles", "tiles:all", `[{"id":7,"type":"grass","walkable":true}]`,
+		{"tiles", "v2:tiles:all", `[{"id":7,"type":"grass","walkable":true}]`,
 			"/game/tiles", "/game/tiles", `[{"id":7,"type":"grass","walkable":true}]`, GetTiles},
 	} {
 		t.Run(tc.name, func(t *testing.T) {

@@ -2,6 +2,7 @@ package services
 
 import (
 	"API/api/dto"
+	"context"
 	"encoding/json"
 	"errors"
 	"reflect"
@@ -41,9 +42,9 @@ func mapServiceTestCases() []mapServiceTestCase {
 			Terrains: []dto.Terrain{{TileId: 8, X: 0, Y: 1, Type: "water", Walkable: false, SetX: 2, SetY: 3}}},
 	}
 	return []mapServiceTestCase{
-		{"all maps", "maps:all", "failed to fetch maps", func() (any, error) { return GetAllMaps() }, maps},
-		{"one map", "map:9", "failed to fetch map, map_id 9", func() (any, error) { return GetMapByID(9) }, &maps[1]},
-		{"tiles", "tiles:all", "failed to fetch tiles", func() (any, error) { return GetTiles() },
+		{"all maps", "v2:maps:all", "failed to fetch maps", func() (any, error) { return GetAllMaps(context.Background()) }, maps},
+		{"one map", "v2:map:9", "failed to fetch map, map_id 9", func() (any, error) { return GetMapByID(context.Background(), 9) }, &maps[1]},
+		{"tiles", "v2:tiles:all", "failed to fetch tiles", func() (any, error) { return GetTiles(context.Background()) },
 			[]dto.Tile{{ID: 7, Type: "grass", ImageURL: &tileImage}, {ID: 8, Type: "water"}}},
 	}
 }
@@ -126,19 +127,19 @@ func TestMapServicesHandleEmptyResults(t *testing.T) {
 	cache := newServiceTestCache(t)
 	db := newMapServiceTestDB(t)
 	execServiceTestSQL(t, db, `DELETE FROM terrains`, `DELETE FROM maps`, `DELETE FROM tiles`)
-	maps, err := GetAllMaps()
+	maps, err := GetAllMaps(context.Background())
 	if err != nil || maps == nil || len(maps) != 0 {
 		t.Fatalf("maps = %+v, error = %v; want empty slice", maps, err)
 	}
-	tiles, err := GetTiles()
+	tiles, err := GetTiles(context.Background())
 	if err != nil || len(tiles) != 0 {
 		t.Fatalf("tiles = %+v, error = %v; want no tiles", tiles, err)
 	}
-	m, err := GetMapByID(9)
+	m, err := GetMapByID(context.Background(), 9)
 	if m != nil || err == nil || err.Error() != "failed to fetch map, map_id 9" {
 		t.Fatalf("map = %+v, error = %v; want missing map error", m, err)
 	}
-	if _, ok := cache.values["map:9"]; ok {
+	if _, ok := cache.values["v2:map:9"]; ok {
 		t.Fatal("missing map was cached")
 	}
 }
@@ -146,23 +147,23 @@ func TestMapServicesHandleEmptyResults(t *testing.T) {
 func TestGetMapByIDKeepsCachedMapsSeparate(t *testing.T) {
 	cache := newServiceTestCache(t)
 	db := newMapServiceTestDB(t)
-	first, err := GetMapByID(3)
+	first, err := GetMapByID(context.Background(), 3)
 	if err != nil {
 		t.Fatal(err)
 	}
-	second, err := GetMapByID(9)
+	second, err := GetMapByID(context.Background(), 9)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if first.ID != 3 || second.ID != 9 || first.Name == second.Name {
 		t.Fatalf("maps were mixed: first = %+v, second = %+v", first, second)
 	}
-	if !reflect.DeepEqual(cache.sets, []string{"map:3", "map:9"}) {
+	if !reflect.DeepEqual(cache.sets, []string{"v2:map:3", "v2:map:9"}) {
 		t.Fatalf("cache writes = %v", cache.sets)
 	}
 	execServiceTestSQL(t, db, `DROP TABLE maps`)
 	for _, want := range []*dto.Map{first, second} {
-		got, err := GetMapByID(want.ID)
+		got, err := GetMapByID(context.Background(), want.ID)
 		if err != nil || !reflect.DeepEqual(got, want) {
 			t.Fatalf("cached map = %+v, error = %v; want %+v", got, err, want)
 		}

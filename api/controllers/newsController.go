@@ -34,7 +34,7 @@ func GetNews(c *gin.Context) {
 		pageSize = parsedPageSize
 	}
 
-	news, totalCount, err := services.GetNews(page, pageSize)
+	news, totalCount, err := services.GetNews(c.Request.Context(), page, pageSize)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return

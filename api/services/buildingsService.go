@@ -4,9 +4,7 @@ import (
 	"API/api/dto"
 	"API/database"
 	"API/models"
-	redisClient "API/redis"
 	"context"
-	"encoding/json"
 	"fmt"
 	"log"
 	"time"
@@ -17,34 +15,36 @@ const (
 	buildingsCacheTTL = 10 * time.Minute
 )
 
-func GetAllBuildings() ([]dto.BuildingWithDetails, error) {
-	ctx := context.Background()
+func GetAllBuildings(ctx context.Context) ([]dto.BuildingWithDetails, error) {
+	return cached(ctx, buildingsCacheKey, buildingsCacheTTL, loadBuildings)
+}
 
-	cached, err := redisClient.RDB.Get(ctx, buildingsCacheKey).Result()
-	if err == nil {
-		var buildingsWithDetails []dto.BuildingWithDetails
-		if jsonErr := json.Unmarshal([]byte(cached), &buildingsWithDetails); jsonErr == nil {
-			return buildingsWithDetails, nil
-		}
-	}
-
+func loadBuildings() ([]dto.BuildingWithDetails, error) {
 	var buildings []models.Building
 
-	// Preload related data: Category, ConstructionCosts with Item, and Productions with Item
+	// New buildings are always placed at level 1, so only that level is needed.
 	if err := database.DB.
 		Preload("Category").
 		Preload("ConstructionCosts.Item").
 		Preload("Productions.Item").
-		Preload("Levels").
+		Preload("Levels", "level = ?", 1).
+		Order("id ASC").
 		Find(&buildings).Error; err != nil {
 		log.Default().Println("failed to fetch buildings", err)
 		return nil, fmt.Errorf("failed to fetch buildings")
 	}
 
-	var buildingsWithDetails []dto.BuildingWithDetails
+	buildingsWithDetails := make([]dto.BuildingWithDetails, 0, len(buildings))
 	for _, building := range buildings {
-		// Map construction costs
-		var costs []dto.BuildingCost
+		// AddPlayerBuilding rejects buildings without a level 1 row, so listing
+		// them would offer the player something that can never be placed.
+		if len(building.Levels) == 0 {
+			log.Default().Printf("building %d has no level 1, leaving it out of the catalog", building.ID)
+			continue
+		}
+		level := building.Levels[0]
+
+		costs := make([]dto.BuildingCost, 0, len(building.ConstructionCosts))
 		for _, cost := range building.ConstructionCosts {
 			costs = append(costs, dto.BuildingCost{
 				ItemID:   cost.ItemID,
@@ -53,8 +53,7 @@ func GetAllBuildings() ([]dto.BuildingWithDetails, error) {
 			})
 		}
 
-		// Map production items
-		var productions []dto.BuildingProductionItem
+		productions := make([]dto.BuildingProductionItem, 0, len(building.Productions))
 		for _, prod := range building.Productions {
 			productions = append(productions, dto.BuildingProductionItem{
 				BuildingProductionID:  prod.ID,
@@ -65,17 +64,6 @@ func GetAllBuildings() ([]dto.BuildingWithDetails, error) {
 			})
 		}
 
-		// New buildings are always placed at level 1, so its population values
-		// are what the player pays or gains when building.
-		populationCapacity, populationCost := 0, 0
-		for _, level := range building.Levels {
-			if level.Level == 1 {
-				populationCapacity = level.PopulationCapacity
-				populationCost = level.PopulationCost
-				break
-			}
-		}
-
 		buildingsWithDetails = append(buildingsWithDetails, dto.BuildingWithDetails{
 			ID:                 building.ID,
 			Name:               building.Name,
@@ -84,15 +72,11 @@ func GetAllBuildings() ([]dto.BuildingWithDetails, error) {
 			Width:              building.Width,
 			Length:             building.Length,
 			BuildingCategory:   building.Category.Name,
-			PopulationCapacity: populationCapacity,
-			PopulationCost:     populationCost,
+			PopulationCapacity: level.PopulationCapacity,
+			PopulationCost:     level.PopulationCost,
 			Costs:              costs,
 			Productions:        productions,
 		})
-	}
-
-	if data, jsonErr := json.Marshal(buildingsWithDetails); jsonErr == nil {
-		redisClient.RDB.Set(ctx, buildingsCacheKey, data, buildingsCacheTTL)
 	}
 
 	return buildingsWithDetails, nil

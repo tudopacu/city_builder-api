@@ -33,7 +33,7 @@ func TestGetItemsReturnsEmptyArray(t *testing.T) {
 
 func TestGetItemsReturnsCachedCatalog(t *testing.T) {
 	cache := newControllerTestCache(t)
-	cache.Set("items:all", `[{"id":7,"name":"Iron","type":"resource","is_tradeable":true}]`)
+	cache.Set("v2:items:all", `[{"id":7,"name":"Iron","type":"resource","is_tradeable":true}]`)
 	// A cache hit must work without querying the deliberately empty database.
 	newControllerTestDB(t)
 

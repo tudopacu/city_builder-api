@@ -8,6 +8,7 @@ import (
 	"net"
 	"strconv"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -56,6 +57,7 @@ func execServiceTestSQL(t *testing.T, db *gorm.DB, statements ...string) {
 // and database queries, while controlling cache hits, misses, and failures.
 // TTLs record requested expiration; the fixture does not emulate Redis clocks.
 type serviceTestCache struct {
+	mu     sync.Mutex
 	values map[string]string
 	ttls   map[string]time.Duration
 	getErr error
@@ -95,6 +97,8 @@ func (c *serviceTestCache) DialHook(redis.DialHook) redis.DialHook {
 
 func (c *serviceTestCache) ProcessHook(redis.ProcessHook) redis.ProcessHook {
 	return func(_ context.Context, cmd redis.Cmder) error {
+		c.mu.Lock()
+		defer c.mu.Unlock()
 		args := cmd.Args()
 		switch cmd.Name() {
 		case "get":

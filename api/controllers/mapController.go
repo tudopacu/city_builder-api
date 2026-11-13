@@ -8,7 +8,7 @@ import (
 )
 
 func GetMaps(c *gin.Context) {
-	maps, err := services.GetAllMaps()
+	maps, err := services.GetAllMaps(c.Request.Context())
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "no maps found"})
 		return
@@ -23,7 +23,7 @@ func GetMap(c *gin.Context) {
 		return
 	}
 
-	mapDto, err := services.GetMapByID(uint(mapId))
+	mapDto, err := services.GetMapByID(c.Request.Context(), uint(mapId))
 
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err})
@@ -34,7 +34,7 @@ func GetMap(c *gin.Context) {
 }
 
 func GetTiles(c *gin.Context) {
-	tiles, err := services.GetTiles()
+	tiles, err := services.GetTiles(c.Request.Context())
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err})
 		return

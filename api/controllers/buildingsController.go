@@ -7,7 +7,7 @@ import (
 )
 
 func GetBuildings(c *gin.Context) {
-	buildings, err := services.GetAllBuildings()
+	buildings, err := services.GetAllBuildings(c.Request.Context())
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return

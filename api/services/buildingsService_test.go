@@ -2,6 +2,7 @@ package services
 
 import (
 	"API/api/dto"
+	"context"
 	"encoding/json"
 	"errors"
 	"reflect"
@@ -30,11 +31,12 @@ func seedBuildingsServiceCatalog(t *testing.T) (*gorm.DB, []dto.BuildingWithDeta
 		`INSERT INTO building_categories (id, name) VALUES (2, 'Production'), (3, 'Storage')`,
 		`INSERT INTO buildings (id, name, image_url, description, width, length, building_category_id) VALUES
 			(5, 'Sawmill', '/images/sawmill.png', 'Cuts timber', 3, 4, 2),
-			(6, 'Warehouse', NULL, 'Stores goods', 2, 3, 3)`,
+			(6, 'Warehouse', NULL, 'Stores goods', 2, 3, 3),
+			(7, 'Ruin', NULL, 'Missing its level data', 1, 1, 3)`,
 		// Only level 1 counts for new buildings, so the level 2 values must be ignored.
-		// The warehouse has no levels and must report zero population.
+		// The ruin has no level 1, can never be placed, and must be left out.
 		`INSERT INTO building_levels (id, building_id, level, population_capacity, population_cost) VALUES
-			(21, 5, 1, 0, 3), (22, 5, 2, 0, 9)`,
+			(21, 5, 1, 0, 3), (22, 5, 2, 0, 9), (23, 6, 1, 4, 0), (24, 7, 2, 0, 1)`,
 		`INSERT INTO items (id, name) VALUES (7, 'Stone'), (8, 'Wood')`,
 		`INSERT INTO building_construction_costs (id, building_id, item_id, quantity) VALUES
 			(11, 5, 7, 20), (12, 6, 8, 10)`,
@@ -53,7 +55,9 @@ func seedBuildingsServiceCatalog(t *testing.T) (*gorm.DB, []dto.BuildingWithDeta
 		},
 		{
 			ID: 6, Name: "Warehouse", Description: "Stores goods", Width: 2, Length: 3,
-			BuildingCategory: "Storage", Costs: []dto.BuildingCost{{ItemID: 8, ItemName: "Wood", Quantity: 10}},
+			BuildingCategory: "Storage", PopulationCapacity: 4,
+			Costs:       []dto.BuildingCost{{ItemID: 8, ItemName: "Wood", Quantity: 10}},
+			Productions: []dto.BuildingProductionItem{},
 		},
 	}
 	return db, want
@@ -66,27 +70,27 @@ func TestGetAllBuildingsLoadsAssociationsAndCachesResult(t *testing.T) {
 			_, want := seedBuildingsServiceCatalog(t)
 			switch mode {
 			case "corrupt cache":
-				cache.Set("buildings:all", `{"invalid":`)
+				cache.Set("v2:buildings:all", `{"invalid":`)
 			case "cache read error":
-				cache.Set("buildings:all", `[]`)
+				cache.Set("v2:buildings:all", `[]`)
 				cache.getErr = errors.New("cache unavailable")
 			}
 
-			got, err := GetAllBuildings()
+			got, err := GetAllBuildings(context.Background())
 			if err != nil {
 				t.Fatal(err)
 			}
 			if !reflect.DeepEqual(got, want) {
 				t.Fatalf("buildings = %#v, want %#v", got, want)
 			}
-			if !reflect.DeepEqual(cache.gets, []string{"buildings:all"}) || !reflect.DeepEqual(cache.sets, []string{"buildings:all"}) {
+			if !reflect.DeepEqual(cache.gets, []string{"v2:buildings:all"}) || !reflect.DeepEqual(cache.sets, []string{"v2:buildings:all"}) {
 				t.Fatalf("cache calls: GET %v, SET %v", cache.gets, cache.sets)
 			}
-			if ttl := cache.ttls["buildings:all"]; ttl != 10*time.Minute {
+			if ttl := cache.ttls["v2:buildings:all"]; ttl != 10*time.Minute {
 				t.Fatalf("cache TTL = %s, want 10m", ttl)
 			}
 			var cached []dto.BuildingWithDetails
-			if err := json.Unmarshal([]byte(cache.values["buildings:all"]), &cached); err != nil {
+			if err := json.Unmarshal([]byte(cache.values["v2:buildings:all"]), &cached); err != nil {
 				t.Fatalf("invalid cached JSON: %v", err)
 			}
 			if !reflect.DeepEqual(cached, want) {
@@ -98,7 +102,7 @@ func TestGetAllBuildingsLoadsAssociationsAndCachesResult(t *testing.T) {
 
 func TestGetAllBuildingsReturnsCachedCatalogWithoutDatabase(t *testing.T) {
 	cache := newServiceTestCache(t)
-	cache.Set("buildings:all", `[{
+	cache.Set("v2:buildings:all", `[{
 		"id":5,"name":"Sawmill","image_url":"/images/sawmill.png","description":"Cuts timber",
 		"width":3,"length":4,"building_category":"Production",
 		"costs":[{"item_id":7,"item_name":"Stone","quantity":20}],
@@ -114,11 +118,11 @@ func TestGetAllBuildingsReturnsCachedCatalogWithoutDatabase(t *testing.T) {
 		}},
 	}}
 
-	got, err := GetAllBuildings()
+	got, err := GetAllBuildings(context.Background())
 	if err != nil || !reflect.DeepEqual(got, want) {
 		t.Fatalf("buildings = %#v, error = %v, want %#v", got, err, want)
 	}
-	if !reflect.DeepEqual(cache.gets, []string{"buildings:all"}) || len(cache.sets) != 0 {
+	if !reflect.DeepEqual(cache.gets, []string{"v2:buildings:all"}) || len(cache.sets) != 0 {
 		t.Fatalf("cache hit should only read: GET %v, SET %v", cache.gets, cache.sets)
 	}
 }
@@ -127,13 +131,13 @@ func TestGetAllBuildingsReturnsEmptyCatalog(t *testing.T) {
 	cache := newServiceTestCache(t)
 	newServiceTestDB(t, `CREATE TABLE buildings (id INTEGER PRIMARY KEY)`)
 
-	got, err := GetAllBuildings()
+	got, err := GetAllBuildings(context.Background())
 	if err != nil || len(got) != 0 {
 		t.Fatalf("buildings = %#v, error = %v, want an empty catalog", got, err)
 	}
 	var cached []dto.BuildingWithDetails
-	if err := json.Unmarshal([]byte(cache.values["buildings:all"]), &cached); err != nil || len(cached) != 0 {
-		t.Fatalf("cached empty catalog = %q, error = %v", cache.values["buildings:all"], err)
+	if err := json.Unmarshal([]byte(cache.values["v2:buildings:all"]), &cached); err != nil || len(cached) != 0 {
+		t.Fatalf("cached empty catalog = %q, error = %v", cache.values["v2:buildings:all"], err)
 	}
 }
 
@@ -142,11 +146,11 @@ func TestGetAllBuildingsIgnoresCacheWriteFailure(t *testing.T) {
 	cache.setErr = errors.New("cache is read-only")
 	_, want := seedBuildingsServiceCatalog(t)
 
-	got, err := GetAllBuildings()
+	got, err := GetAllBuildings(context.Background())
 	if err != nil || !reflect.DeepEqual(got, want) {
 		t.Fatalf("buildings = %#v, error = %v, want %#v despite cache error", got, err, want)
 	}
-	if !reflect.DeepEqual(cache.sets, []string{"buildings:all"}) {
+	if !reflect.DeepEqual(cache.sets, []string{"v2:buildings:all"}) {
 		t.Fatalf("cache writes = %v, want one attempted catalog write", cache.sets)
 	}
 }
@@ -158,7 +162,7 @@ func TestGetAllBuildingsReturnsDatabaseErrorsWithoutCaching(t *testing.T) {
 			db, _ := seedBuildingsServiceCatalog(t)
 			execServiceTestSQL(t, db, "DROP TABLE "+table)
 
-			got, err := GetAllBuildings()
+			got, err := GetAllBuildings(context.Background())
 			if err == nil || err.Error() != "failed to fetch buildings" || got != nil {
 				t.Fatalf("buildings = %#v, error = %v, want failed to fetch buildings", got, err)
 			}

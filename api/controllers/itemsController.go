@@ -7,7 +7,7 @@ import (
 )
 
 func GetItems(c *gin.Context) {
-	items, err := services.GetAllItems()
+	items, err := services.GetAllItems(c.Request.Context())
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return

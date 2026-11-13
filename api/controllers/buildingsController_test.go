@@ -64,7 +64,7 @@ func TestGetBuildingsReturnsEmptyCatalog(t *testing.T) {
 
 func TestGetBuildingsReturnsCachedCatalog(t *testing.T) {
 	cache := newControllerTestCache(t)
-	cache.Set("buildings:all", `[{
+	cache.Set("v2:buildings:all", `[{
 		"id":9,"name":"Warehouse","description":"Stores goods","width":2,"length":3,
 		"building_category":"Storage","costs":[],"productions":[]
 	}]`)

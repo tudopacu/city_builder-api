@@ -4,9 +4,7 @@ import (
 	"API/api/dto"
 	"API/database"
 	"API/models"
-	redisClient "API/redis"
 	"context"
-	"encoding/json"
 	"fmt"
 	"log"
 	"time"
@@ -19,45 +17,38 @@ type newsCacheEntry struct {
 	TotalCount int64      `json:"total_count"`
 }
 
-func GetNews(page, pageSize int) ([]dto.News, int64, error) {
-	ctx := context.Background()
+func GetNews(ctx context.Context, page, pageSize int) ([]dto.News, int64, error) {
 	cacheKey := fmt.Sprintf("news:page:%d:size:%d", page, pageSize)
 
-	cached, err := redisClient.RDB.Get(ctx, cacheKey).Result()
-	if err == nil {
-		var entry newsCacheEntry
-		if jsonErr := json.Unmarshal([]byte(cached), &entry); jsonErr == nil {
-			return entry.News, entry.TotalCount, nil
+	entry, err := cached(ctx, cacheKey, newsCacheTTL, func() (newsCacheEntry, error) {
+		var newsModels []models.News
+		var totalCount int64
+
+		// Get total count
+		if err := database.DB.Model(&models.News{}).Count(&totalCount).Error; err != nil {
+			log.Default().Println("failed to count news", err)
+			return newsCacheEntry{}, fmt.Errorf("failed to count news")
 		}
+
+		// Calculate offset
+		offset := (page - 1) * pageSize
+
+		// Get paginated news ordered by created_at descending (most recent first)
+		if err := database.DB.Order("created_at DESC").Limit(pageSize).Offset(offset).Find(&newsModels).Error; err != nil {
+			log.Default().Println("failed to fetch news", err)
+			return newsCacheEntry{}, fmt.Errorf("failed to fetch news")
+		}
+
+		dtoNews := make([]dto.News, 0, len(newsModels))
+		for _, news := range newsModels {
+			dtoNews = append(dtoNews, news.ToDTO())
+		}
+
+		return newsCacheEntry{News: dtoNews, TotalCount: totalCount}, nil
+	})
+	if err != nil {
+		return nil, 0, err
 	}
 
-	var newsModels []models.News
-	var totalCount int64
-
-	// Get total count
-	if err := database.DB.Model(&models.News{}).Count(&totalCount).Error; err != nil {
-		log.Default().Println("failed to count news", err)
-		return nil, 0, fmt.Errorf("failed to count news")
-	}
-
-	// Calculate offset
-	offset := (page - 1) * pageSize
-
-	// Get paginated news ordered by created_at descending (most recent first)
-	if err := database.DB.Order("created_at DESC").Limit(pageSize).Offset(offset).Find(&newsModels).Error; err != nil {
-		log.Default().Println("failed to fetch news", err)
-		return nil, 0, fmt.Errorf("failed to fetch news")
-	}
-
-	var dtoNews []dto.News
-	for _, news := range newsModels {
-		dtoNews = append(dtoNews, news.ToDTO())
-	}
-
-	entry := newsCacheEntry{News: dtoNews, TotalCount: totalCount}
-	if data, jsonErr := json.Marshal(entry); jsonErr == nil {
-		redisClient.RDB.Set(ctx, cacheKey, data, newsCacheTTL)
-	}
-
-	return dtoNews, totalCount, nil
+	return entry.News, entry.TotalCount, nil
 }

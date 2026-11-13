@@ -89,6 +89,46 @@ func TestGetPlayerBuildingsScopesBuildingsAndCompletesExpiredProductions(t *test
 	}
 }
 
+// Before StartProduction checked ownership, player 2 could record productions in
+// player 1's buildings. Player 1 must not see them as their own.
+func TestGetPlayerBuildingsIgnoresProductionsRecordedByAnotherPlayer(t *testing.T) {
+	db := newPlayerBuildingLifecycleTestDB(t)
+	execBuildingTestSQL(t, db,
+		`INSERT INTO player_buildings (id, player_id, building_id, map_id, building_level_id, x, y) VALUES
+			(10, 1, 30, 1, 31, 2, 3), (20, 1, 30, 1, 31, 4, 5)`,
+		`INSERT INTO items (id, name, type) VALUES (7, 'Wood', 'resource')`,
+		`INSERT INTO building_productions (id, building_id, item_id, quantity) VALUES (60, 30, 7, 5)`,
+	)
+	future := time.Now().Add(time.Hour)
+	productions := []models.PlayerBuildingProduction{
+		// Building 10 only has player 2's production.
+		{ID: 100, PlayerID: 2, PlayerBuildingID: 10, BuildingProductionID: 60, EndTime: future, Status: "PENDING"},
+		// Building 20 has player 1's own production, and a newer one of player 2.
+		{ID: 200, PlayerID: 1, PlayerBuildingID: 20, BuildingProductionID: 60, EndTime: future, Status: "PENDING"},
+		{ID: 300, PlayerID: 2, PlayerBuildingID: 20, BuildingProductionID: 60, EndTime: future, Status: "PENDING"},
+	}
+	if err := db.Create(&productions).Error; err != nil {
+		t.Fatal(err)
+	}
+	buildings, err := GetPlayerBuildings(1, 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	byID := make(map[uint]dto.PlayerBuilding)
+	for _, building := range buildings {
+		byID[building.ID] = building
+	}
+	if len(byID) != 2 {
+		t.Fatalf("buildings = %+v, want buildings 10 and 20", buildings)
+	}
+	if production := byID[10].BuildingCurrentProduction; production != nil {
+		t.Fatalf("building 10 shows player 2's production %d", production.ID)
+	}
+	if production := byID[20].BuildingCurrentProduction; production == nil || production.ID != 200 {
+		t.Fatalf("building 20 production = %+v, want player 1's production 200", production)
+	}
+}
+
 func TestGetPlayerBuildingsReturnsEmptySlice(t *testing.T) {
 	newPlayerBuildingLifecycleTestDB(t)
 	buildings, err := GetPlayerBuildings(1, 1)

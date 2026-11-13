@@ -230,4 +230,11 @@ func TestPlayerCannotProduceInAnotherPlayersBuilding(t *testing.T) {
 	if itemCount != 0 {
 		t.Fatalf("player 2 received %d inventory items from player 1's building", itemCount)
 	}
+
+	// Nor does that production show up in player 1's game, where it would block the building.
+	response = performPlayerRequest(t, 1, http.MethodGet, "/game/get_player_buildings/:map_id",
+		"/game/get_player_buildings/9", "", GetPlayerBuildings)
+	assertControllerJSON(t, response, http.StatusOK, `{"player_buildings":[
+		{"id":10,"building":{"id":30,"name":"Sawmill","description":"","width":1,"length":1,"building_category":"Production"},
+		"level":1,"x":2,"y":3,"building_current_production":null}]}`)
 }

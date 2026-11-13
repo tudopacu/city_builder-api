@@ -38,7 +38,10 @@ func GetPlayerBuildings(playerId uint, mapId uint) ([]dto.PlayerBuilding, error)
 		Preload("Building.Category").
 		Preload("Building.Levels").
 		Preload("BuildingLevel").
-		Preload("BuildingCurrentProduction", "status <> ?", "COLLECTED").
+		// Only the player's own productions count. Another player could record one in
+		// this player's building before StartProduction checked ownership, and it must
+		// not show up here, where the player could neither collect nor replace it.
+		Preload("BuildingCurrentProduction", "status <> ? AND player_id = ?", "COLLECTED", playerId).
 		Preload("BuildingCurrentProduction.BuildingProduction.Item").
 		Find(&playerBuildingModels, "player_id = ? AND map_id = ?", playerId, mapId).
 		Error; err != nil {

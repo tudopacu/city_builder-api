@@ -19,11 +19,11 @@ func GetAllBuildings(ctx context.Context) ([]dto.BuildingWithDetails, error) {
 	return cached(ctx, buildingsCacheKey, buildingsCacheTTL, loadBuildings)
 }
 
-func loadBuildings() ([]dto.BuildingWithDetails, error) {
+func loadBuildings(ctx context.Context) ([]dto.BuildingWithDetails, error) {
 	var buildings []models.Building
 
 	// New buildings are always placed at level 1, so only that level is needed.
-	if err := database.DB.
+	if err := database.DB.WithContext(ctx).
 		Preload("Category").
 		Preload("ConstructionCosts.Item").
 		Preload("Productions.Item").

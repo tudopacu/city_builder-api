@@ -10,7 +10,14 @@ import (
 	"time"
 )
 
-const newsCacheTTL = 5 * time.Minute
+const (
+	newsCacheTTL = 5 * time.Minute
+
+	// maxCachedNewsPage caps how many pages are cached per page size. Readers
+	// rarely go deep, and caching every requested page would let a client
+	// create an unbounded number of keys.
+	maxCachedNewsPage = 10
+)
 
 type newsCacheEntry struct {
 	News       []dto.News `json:"news"`
@@ -18,14 +25,12 @@ type newsCacheEntry struct {
 }
 
 func GetNews(ctx context.Context, page, pageSize int) ([]dto.News, int64, error) {
-	cacheKey := fmt.Sprintf("news:page:%d:size:%d", page, pageSize)
-
-	entry, err := cached(ctx, cacheKey, newsCacheTTL, func() (newsCacheEntry, error) {
+	load := func(ctx context.Context) (newsCacheEntry, error) {
 		var newsModels []models.News
 		var totalCount int64
 
 		// Get total count
-		if err := database.DB.Model(&models.News{}).Count(&totalCount).Error; err != nil {
+		if err := database.DB.WithContext(ctx).Model(&models.News{}).Count(&totalCount).Error; err != nil {
 			log.Default().Println("failed to count news", err)
 			return newsCacheEntry{}, fmt.Errorf("failed to count news")
 		}
@@ -34,7 +39,7 @@ func GetNews(ctx context.Context, page, pageSize int) ([]dto.News, int64, error)
 		offset := (page - 1) * pageSize
 
 		// Get paginated news ordered by created_at descending (most recent first)
-		if err := database.DB.Order("created_at DESC").Limit(pageSize).Offset(offset).Find(&newsModels).Error; err != nil {
+		if err := database.DB.WithContext(ctx).Order("created_at DESC").Limit(pageSize).Offset(offset).Find(&newsModels).Error; err != nil {
 			log.Default().Println("failed to fetch news", err)
 			return newsCacheEntry{}, fmt.Errorf("failed to fetch news")
 		}
@@ -45,7 +50,16 @@ func GetNews(ctx context.Context, page, pageSize int) ([]dto.News, int64, error)
 		}
 
 		return newsCacheEntry{News: dtoNews, TotalCount: totalCount}, nil
-	})
+	}
+
+	var entry newsCacheEntry
+	var err error
+	if page <= maxCachedNewsPage {
+		cacheKey := fmt.Sprintf("news:page:%d:size:%d", page, pageSize)
+		entry, err = cached(ctx, cacheKey, newsCacheTTL, load)
+	} else {
+		entry, err = load(ctx)
+	}
 	if err != nil {
 		return nil, 0, err
 	}

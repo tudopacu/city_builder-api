@@ -13,6 +13,7 @@ import (
 	"reflect"
 	"strconv"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -124,12 +125,15 @@ func assertControllerError(t *testing.T, response *httptest.ResponseRecorder, st
 // It bypasses the network, keeping controller tests independent of Redis.
 // Expiration is deliberately outside the scope of these HTTP handler tests.
 type controllerTestCache struct {
+	mu     sync.Mutex
 	values map[string]string
+	// writes is signalled after every SET; services write in the background.
+	writes chan struct{}
 }
 
 func newControllerTestCache(t *testing.T) *controllerTestCache {
 	t.Helper()
-	cache := &controllerTestCache{values: make(map[string]string)}
+	cache := &controllerTestCache{values: make(map[string]string), writes: make(chan struct{}, 1)}
 	client := redis.NewClient(&redis.Options{Addr: "unused:6379"})
 	client.AddHook(cache)
 	previousClient := redisClient.RDB
@@ -144,7 +148,29 @@ func newControllerTestCache(t *testing.T) *controllerTestCache {
 }
 
 func (c *controllerTestCache) Set(key, value string) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
 	c.values[key] = value
+}
+
+// waitForWrite blocks until key has been written, since services store cache
+// entries off the response path.
+func (c *controllerTestCache) waitForWrite(t *testing.T, key string) {
+	t.Helper()
+	timeout := time.After(time.Second)
+	for {
+		c.mu.Lock()
+		_, ok := c.values[key]
+		c.mu.Unlock()
+		if ok {
+			return
+		}
+		select {
+		case <-c.writes:
+		case <-timeout:
+			t.Fatalf("cache entry %s was never written", key)
+		}
+	}
 }
 
 func (c *controllerTestCache) DialHook(redis.DialHook) redis.DialHook {
@@ -157,7 +183,9 @@ func (c *controllerTestCache) ProcessHook(redis.ProcessHook) redis.ProcessHook {
 	return func(_ context.Context, cmd redis.Cmder) error {
 		switch cmd.Name() {
 		case "get":
+			c.mu.Lock()
 			value, ok := c.values[cmd.Args()[1].(string)]
+			c.mu.Unlock()
 			if !ok {
 				cmd.SetErr(redis.Nil)
 				return redis.Nil
@@ -177,6 +205,10 @@ func (c *controllerTestCache) ProcessHook(redis.ProcessHook) redis.ProcessHook {
 				return err
 			}
 			c.Set(cmd.Args()[1].(string), value)
+			select {
+			case c.writes <- struct{}{}:
+			default:
+			}
 			cmd.(*redis.StatusCmd).SetVal("OK")
 			return nil
 		default:

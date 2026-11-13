@@ -131,6 +131,18 @@ func TestGetNewsFallsBackOnCacheProblems(t *testing.T) {
 	}
 }
 
+func TestGetNewsServesDeepPagesWithoutCaching(t *testing.T) {
+	cache := newServiceTestCache(t)
+	newNewsServiceTestDB(t, 3)
+	news, count, err := GetNews(context.Background(), maxCachedNewsPage+1, 2)
+	if err != nil || len(news) != 0 || count != 3 {
+		t.Fatalf("news = %+v, count = %d, error = %v", news, count, err)
+	}
+	if len(cache.gets) != 0 || len(cache.sets) != 0 {
+		t.Fatalf("deep page used the cache: gets = %v, sets = %v", cache.gets, cache.sets)
+	}
+}
+
 func TestGetNewsReturnsDatabaseFailuresWithoutCaching(t *testing.T) {
 	for _, tc := range []struct {
 		name, schema, want string

@@ -19,9 +19,9 @@ func GetAllItems(ctx context.Context) ([]dto.Item, error) {
 	return cached(ctx, itemsCacheKey, itemsCacheTTL, loadItems)
 }
 
-func loadItems() ([]dto.Item, error) {
+func loadItems(ctx context.Context) ([]dto.Item, error) {
 	var items []models.Item
-	if err := database.DB.Order("id ASC").Find(&items).Error; err != nil {
+	if err := database.DB.WithContext(ctx).Order("id ASC").Find(&items).Error; err != nil {
 		log.Default().Println("failed to fetch items", err)
 		return nil, fmt.Errorf("failed to fetch items")
 	}

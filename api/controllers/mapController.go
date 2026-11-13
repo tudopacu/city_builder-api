@@ -2,6 +2,7 @@ package controllers
 
 import (
 	"API/api/services"
+	"errors"
 	"github.com/gin-gonic/gin"
 	"net/http"
 	"strconv"
@@ -24,9 +25,12 @@ func GetMap(c *gin.Context) {
 	}
 
 	mapDto, err := services.GetMapByID(c.Request.Context(), uint(mapId))
-
+	if errors.Is(err, services.ErrMapNotFound) {
+		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
+		return
+	}
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
@@ -36,7 +40,7 @@ func GetMap(c *gin.Context) {
 func GetTiles(c *gin.Context) {
 	tiles, err := services.GetTiles(c.Request.Context())
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 

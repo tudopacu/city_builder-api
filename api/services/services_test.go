@@ -74,10 +74,12 @@ func newServiceTestCache(t *testing.T) *serviceTestCache {
 	}
 	client := redis.NewClient(&redis.Options{Addr: "unused:6379"})
 	client.AddHook(cache)
-	previousClient := redisClient.RDB
+	previousClient, previousStartWrite := redisClient.RDB, startCacheWrite
 	redisClient.RDB = client
+	// Write synchronously so tests can assert on cache writes right away.
+	startCacheWrite = func(write func()) { write() }
 	t.Cleanup(func() {
-		redisClient.RDB = previousClient
+		redisClient.RDB, startCacheWrite = previousClient, previousStartWrite
 		if err := client.Close(); err != nil {
 			t.Error(err)
 		}

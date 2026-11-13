@@ -136,11 +136,17 @@ func TestMapServicesHandleEmptyResults(t *testing.T) {
 		t.Fatalf("tiles = %+v, error = %v; want no tiles", tiles, err)
 	}
 	m, err := GetMapByID(context.Background(), 9)
-	if m != nil || err == nil || err.Error() != "failed to fetch map, map_id 9" {
-		t.Fatalf("map = %+v, error = %v; want missing map error", m, err)
+	if m != nil || !errors.Is(err, ErrMapNotFound) {
+		t.Fatalf("map = %+v, error = %v; want ErrMapNotFound", m, err)
 	}
-	if _, ok := cache.values["v2:map:9"]; ok {
-		t.Fatal("missing map was cached")
+	if got := cache.values["v2:map:9"]; got != "null" {
+		t.Fatalf("missing map cache entry = %q, want null", got)
+	}
+	// The cached miss answers repeat lookups without the database.
+	execServiceTestSQL(t, db, `DROP TABLE maps`)
+	m, err = GetMapByID(context.Background(), 9)
+	if m != nil || !errors.Is(err, ErrMapNotFound) {
+		t.Fatalf("map = %+v, error = %v; want cached ErrMapNotFound", m, err)
 	}
 }
 

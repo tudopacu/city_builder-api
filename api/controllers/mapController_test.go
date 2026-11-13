@@ -1,7 +1,6 @@
 package controllers
 
 import (
-	"encoding/json"
 	"net/http"
 	"testing"
 
@@ -76,33 +75,19 @@ func TestGetMapRejectsInvalidID(t *testing.T) {
 	}
 }
 
-func TestGetMapReturnsServiceErrors(t *testing.T) {
-	for _, missingTable := range []bool{false, true} {
-		name := "missing map"
-		if missingTable {
-			name = "database failure"
-		}
-		t.Run(name, func(t *testing.T) {
-			newControllerTestCache(t)
-			db := newMapControllerTestDB(t)
-			if missingTable {
-				execControllerSQL(t, db, `DROP TABLE maps`)
-			}
-			response := performControllerRequest(http.MethodGet, "/game/map/:id", "/game/map/99", "", GetMap)
-			if response.Code != http.StatusInternalServerError {
-				t.Fatalf("status = %d, body = %s", response.Code, response.Body.String())
-			}
-			// The controller currently serializes the error value directly.
-			// Check the envelope without prescribing that representation.
-			var payload map[string]json.RawMessage
-			if err := json.Unmarshal(response.Body.Bytes(), &payload); err != nil {
-				t.Fatal(err)
-			}
-			if len(payload) != 1 || payload["error"] == nil {
-				t.Fatalf("unexpected error envelope: %s", response.Body.String())
-			}
-		})
-	}
+func TestGetMapReturnsNotFoundForMissingMap(t *testing.T) {
+	newControllerTestCache(t)
+	newMapControllerTestDB(t)
+	response := performControllerRequest(http.MethodGet, "/game/map/:id", "/game/map/99", "", GetMap)
+	assertControllerError(t, response, http.StatusNotFound, "map not found")
+}
+
+func TestGetMapReturnsDatabaseFailure(t *testing.T) {
+	newControllerTestCache(t)
+	db := newMapControllerTestDB(t)
+	execControllerSQL(t, db, `DROP TABLE maps`)
+	response := performControllerRequest(http.MethodGet, "/game/map/:id", "/game/map/99", "", GetMap)
+	assertControllerError(t, response, http.StatusInternalServerError, "failed to fetch map, map_id 99")
 }
 
 func TestGetTilesReturnsBareArray(t *testing.T) {
@@ -121,16 +106,7 @@ func TestGetTilesReturnsServiceError(t *testing.T) {
 	newControllerTestCache(t)
 	newControllerTestDB(t)
 	response := performControllerRequest(http.MethodGet, "/game/tiles", "/game/tiles", "", GetTiles)
-	if response.Code != http.StatusInternalServerError {
-		t.Fatalf("status = %d, body = %s", response.Code, response.Body.String())
-	}
-	var payload map[string]json.RawMessage
-	if err := json.Unmarshal(response.Body.Bytes(), &payload); err != nil {
-		t.Fatal(err)
-	}
-	if len(payload) != 1 || payload["error"] == nil {
-		t.Fatalf("unexpected error envelope: %s", response.Body.String())
-	}
+	assertControllerError(t, response, http.StatusInternalServerError, "failed to fetch tiles")
 }
 
 func TestMapControllersReturnCachedResponses(t *testing.T) {

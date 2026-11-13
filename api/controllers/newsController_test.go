@@ -100,12 +100,13 @@ func TestGetNewsReturnsDatabaseError(t *testing.T) {
 }
 
 func TestGetNewsReusesCachedPage(t *testing.T) {
-	newControllerTestCache(t)
+	cache := newControllerTestCache(t)
 	db := newNewsControllerTestDB(t, 3)
 	first := performControllerRequest(http.MethodGet, "/news", "/news?page=2&pageSize=1", "", GetNews)
 	if first.Code != http.StatusOK {
 		t.Fatalf("status = %d, body = %s", first.Code, first.Body.String())
 	}
+	cache.waitForWrite(t, "v2:news:page:2:size:1")
 	// The same page remains available from cache, while other pages still
 	// need the database. This also checks that cached metadata survives.
 	execControllerSQL(t, db, `DROP TABLE news`)
